@@ -4,7 +4,7 @@ Dollar-Cost Averaging (DCA) Strategy
 This is the most conservative strategy - it invests a fixed amount
 at regular intervals regardless of price, reducing timing risk.
 """
-from typing import Dict, List
+from typing import Dict, List, Optional
 from datetime import datetime, timedelta
 from decimal import Decimal
 import structlog

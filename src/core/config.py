@@ -108,23 +108,25 @@ class TradingModeConfig(BaseSettings):
     # Trading mode: paper (simulation) or live (real trading)
     trading_mode: Literal["paper", "live"] = Field(default="paper", env="TRADING_MODE")
     
-    # Default trading symbols
-    default_symbols: List[str] = Field(
-        default=["BTCUSDT", "ETHUSDT"], 
+    # Default trading symbols (stored as comma-separated string, parsed to list)
+    default_symbols_str: str = Field(
+        default="BTCUSDT,ETHUSDT", 
         env="DEFAULT_SYMBOLS"
     )
-    perp_symbols: List[str] = Field(
-        default=["BTC-PERP", "ETH-PERP"], 
+    perp_symbols_str: str = Field(
+        default="BTC-PERP,ETH-PERP", 
         env="PERP_SYMBOLS"
     )
     
-    @field_validator("default_symbols", "perp_symbols", mode="before")
-    @classmethod
-    def parse_comma_separated(cls, v):
-        """Parse comma-separated string into list."""
-        if isinstance(v, str):
-            return [s.strip() for s in v.split(",")]
-        return v
+    @property
+    def default_symbols(self) -> List[str]:
+        """Parse default_symbols string into list."""
+        return [s.strip() for s in self.default_symbols_str.split(",") if s.strip()]
+    
+    @property
+    def perp_symbols(self) -> List[str]:
+        """Parse perp_symbols string into list."""
+        return [s.strip() for s in self.perp_symbols_str.split(",") if s.strip()]
 
 
 # =============================================================================
@@ -447,7 +449,7 @@ class NotificationConfig(BaseSettings):
     smtp_user: Optional[str] = Field(default=None, env="SMTP_USER")
     smtp_password: Optional[str] = Field(default=None, env="SMTP_PASSWORD")
     smtp_use_tls: bool = Field(default=True, env="SMTP_USE_TLS")
-    email_alert_recipients: List[str] = Field(default=[], env="EMAIL_ALERT_RECIPIENTS")
+    email_alert_recipients_str: Optional[str] = Field(default=None, env="EMAIL_ALERT_RECIPIENTS")
     email_on_critical: bool = Field(default=True, env="EMAIL_ON_CRITICAL")
     email_on_circuit_breaker: bool = Field(default=True, env="EMAIL_ON_CIRCUIT_BREAKER")
     email_on_daily_report: bool = Field(default=False, env="EMAIL_ON_DAILY_REPORT")
@@ -457,15 +459,15 @@ class NotificationConfig(BaseSettings):
     webhook_timeout: int = Field(default=10, env="WEBHOOK_TIMEOUT")
     webhook_retry_attempts: int = Field(default=3, env="WEBHOOK_RETRY_ATTEMPTS")
     
-    @field_validator("email_alert_recipients", mode="before")
-    @classmethod
-    def parse_email_recipients(cls, v):
-        """Parse comma-separated string into list."""
-        if isinstance(v, str):
-            if not v or v == "admin@example.com,ops@example.com":
-                return []
-            return [s.strip() for s in v.split(",")]
-        return v
+    @property
+    def email_alert_recipients(self) -> List[str]:
+        """Parse email recipients string into list."""
+        if not self.email_alert_recipients_str:
+            return []
+        # Skip if it's the example value
+        if self.email_alert_recipients_str == "admin@example.com,ops@example.com":
+            return []
+        return [s.strip() for s in self.email_alert_recipients_str.split(",") if s.strip()]
 
 
 # =============================================================================
@@ -554,30 +556,29 @@ class SecurityConfig(BaseSettings):
     jwt_secret: Optional[str] = Field(default=None, env="JWT_SECRET")
     jwt_expiry_hours: int = Field(default=24, env="JWT_EXPIRY_HOURS")
     
-    # IP Whitelist
-    ip_whitelist: List[str] = Field(default=["127.0.0.1/32"], env="IP_WHITELIST")
+    # IP Whitelist (stored as string, accessed as list via property)
+    ip_whitelist_str: str = Field(default="127.0.0.1/32", env="IP_WHITELIST")
     
     # Dual authorization
     dual_auth_enabled: bool = Field(default=True, env="DUAL_AUTH_ENABLED")
-    dual_auth_operators: List[str] = Field(default=[], env="DUAL_AUTH_OPERATORS")
+    dual_auth_operators_str: Optional[str] = Field(default=None, env="DUAL_AUTH_OPERATORS")
     
-    @field_validator("ip_whitelist", mode="before")
-    @classmethod
-    def parse_ip_whitelist(cls, v):
-        """Parse comma-separated string into list."""
-        if isinstance(v, str):
-            return [s.strip() for s in v.split(",")]
-        return v
+    @property
+    def ip_whitelist(self) -> List[str]:
+        """Parse IP whitelist string into list."""
+        if not self.ip_whitelist_str:
+            return ["127.0.0.1/32"]
+        return [s.strip() for s in self.ip_whitelist_str.split(",") if s.strip()]
     
-    @field_validator("dual_auth_operators", mode="before")
-    @classmethod
-    def parse_operators(cls, v):
-        """Parse comma-separated string into list."""
-        if isinstance(v, str):
-            if not v or v == "operator1@example.com,operator2@example.com":
-                return []
-            return [s.strip() for s in v.split(",")]
-        return v
+    @property
+    def dual_auth_operators(self) -> List[str]:
+        """Parse dual auth operators string into list."""
+        if not self.dual_auth_operators_str:
+            return []
+        # Skip if it's the example value
+        if self.dual_auth_operators_str == "operator1@example.com,operator2@example.com":
+            return []
+        return [s.strip() for s in self.dual_auth_operators_str.split(",") if s.strip()]
 
 
 # =============================================================================
@@ -623,9 +624,9 @@ class TradingConfig(BaseSettings):
     # Mode: 'paper' for testing, 'live' for real trading
     trading_mode: Literal["paper", "live"] = Field(default="paper", env="TRADING_MODE")
     
-    # Default trading pairs
-    default_symbols: List[str] = Field(
-        default=["BTCUSDT", "ETHUSDT"], 
+    # Default trading pairs (stored as string, accessed as list via property)
+    default_symbols_str: str = Field(
+        default="BTCUSDT,ETHUSDT", 
         env="DEFAULT_SYMBOLS"
     )
     
@@ -641,19 +642,16 @@ class TradingConfig(BaseSettings):
     enable_take_profit: bool = Field(default=True, env="ENABLE_TAKE_PROFIT")
     take_profit_pct: float = Field(default=6.0, env="TAKE_PROFIT_PCT")
     
+    @property
+    def default_symbols(self) -> List[str]:
+        """Parse default_symbols string into list."""
+        return [s.strip() for s in self.default_symbols_str.split(",") if s.strip()]
+    
     @field_validator("trading_mode")
     @classmethod
     def validate_trading_mode(cls, v):
         if v not in ("paper", "live"):
             raise ValueError("trading_mode must be 'paper' or 'live'")
-        return v
-    
-    @field_validator("default_symbols", mode="before")
-    @classmethod
-    def parse_symbols(cls, v):
-        """Parse comma-separated string into list."""
-        if isinstance(v, str):
-            return [s.strip() for s in v.split(",")]
         return v
     
     @field_validator("max_position_pct", "max_daily_loss_pct", "max_weekly_loss_pct")

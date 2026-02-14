@@ -12,7 +12,7 @@
 # Configuration
 # ------------------------------------------------------------------------------
 PYTHON := python3
-VENV := .venv
+VENV := venv
 PIP := $(VENV)/bin/pip
 PYTHON_VENV := $(VENV)/bin/python
 VENV_BIN := $(VENV)/bin

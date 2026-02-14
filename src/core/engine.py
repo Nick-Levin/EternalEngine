@@ -477,8 +477,9 @@ class TradingEngine:
         quantity = min(quantity, max_quantity)
         
         # Risk check adjusted size
-        if risk_check.max_position_size:
-            quantity = min(quantity, risk_check.max_position_size)
+        risk_check_max_size = getattr(risk_check, 'max_position_size', None)
+        if risk_check_max_size and isinstance(risk_check_max_size, Decimal):
+            quantity = min(quantity, risk_check_max_size)
         
         if quantity <= 0:
             logger.warning("trading_engine.zero_quantity", 

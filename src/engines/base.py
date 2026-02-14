@@ -28,7 +28,7 @@ class EngineConfig:
         max_slippage_pct: Maximum allowed slippage percentage
         custom_params: Engine-specific parameters
     """
-    engine_type: EngineType
+    engine_type: EngineType = EngineType.CORE_HODL  # Default, should be overridden
     enabled: bool = True
     allocation_pct: Decimal = Decimal("0.0")
     max_position_pct: Decimal = Decimal("0.5")  # 50% of engine capital

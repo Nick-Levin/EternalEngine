@@ -92,7 +92,7 @@ class PortfolioSnapshotModel(Base):
     engine_allocations: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
     positions_value: Mapped[Decimal] = mapped_column(Numeric(36, 18), default=Decimal("0"))
     drawdown_from_ath: Mapped[Decimal] = mapped_column(Numeric(36, 18), default=Decimal("0"))
-    metadata: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
+    metadata_json: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
 
 
 class EngineStateModel(Base):
@@ -489,7 +489,7 @@ class Database:
                 engine_allocations=engine_allocations,
                 positions_value=positions_value,
                 drawdown_from_ath=drawdown_from_ath,
-                metadata=metadata or {}
+                metadata_json=metadata or {}
             )
             session.add(snapshot)
             await session.commit()
@@ -518,7 +518,7 @@ class Database:
                 'engine_allocations': snapshot.engine_allocations,
                 'positions_value': snapshot.positions_value,
                 'drawdown_from_ath': snapshot.drawdown_from_ath,
-                'metadata': snapshot.metadata
+                'metadata': snapshot.metadata_json
             }
     
     # Engine state operations

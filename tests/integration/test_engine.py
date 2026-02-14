@@ -26,6 +26,64 @@ from src.strategies.base import BaseStrategy
 
 
 # =============================================================================
+# Test Configuration Setup
+# =============================================================================
+
+@pytest.fixture(autouse=True)
+def mock_engine_config():
+    """Mock engine configuration with valid API keys for testing."""
+    with patch("src.core.engine.engine_config") as mock_config:
+        mock_config.api_mode = "demo"
+        mock_config.is_demo_mode = True
+        mock_config.is_prod_mode = False
+        mock_config.demo_api_key = "test_demo_key"
+        mock_config.demo_api_secret = "test_demo_secret"
+        mock_config.get_active_api_credentials.return_value = ("test_demo_key", "test_demo_secret")
+        mock_config.validate_configuration.return_value = {"valid": True, "issues": []}
+        
+        # Capital allocation
+        mock_config.capital_allocation = MagicMock()
+        mock_config.capital_allocation.core_hodl = 0.60
+        mock_config.capital_allocation.trend = 0.20
+        mock_config.capital_allocation.funding = 0.15
+        mock_config.capital_allocation.tactical = 0.05
+        
+        # Engine configs - use MagicMock with enabled attribute and model_dump method
+        core_hodl_config = MagicMock()
+        core_hodl_config.enabled = True
+        core_hodl_config.dca_amount_usdt = 100.0
+        core_hodl_config.dca_interval_hours = 24
+        core_hodl_config.model_dump.return_value = {"enabled": True, "dca_amount_usdt": 100.0}
+        mock_config.core_hodl = core_hodl_config
+        
+        trend_config = MagicMock()
+        trend_config.enabled = True
+        trend_config.max_leverage = 2.0
+        trend_config.model_dump.return_value = {"enabled": True, "max_leverage": 2.0}
+        mock_config.trend = trend_config
+        
+        funding_config = MagicMock()
+        funding_config.enabled = True
+        funding_config.min_annualized_rate = 0.10
+        funding_config.max_leverage = 2.0
+        funding_config.model_dump.return_value = {"enabled": True, "min_annualized_rate": 0.10, "max_leverage": 2.0}
+        mock_config.funding = funding_config
+        
+        # Position sizing config
+        mock_config.position_sizing = MagicMock()
+        mock_config.position_sizing.max_risk_per_trade = 0.01
+        mock_config.position_sizing.max_position_pct = 5.0
+        
+        tactical_config = MagicMock()
+        tactical_config.enabled = True
+        tactical_config.profit_target_pct = 100.0
+        tactical_config.model_dump.return_value = {"enabled": True, "profit_target_pct": 100.0}
+        mock_config.tactical = tactical_config
+        
+        yield mock_config
+
+
+# =============================================================================
 # Integration Fixtures
 # =============================================================================
 
@@ -84,6 +142,14 @@ def mock_exchange_client():
     ])
     
     client.fetch_ticker = AsyncMock(return_value={
+        'symbol': 'BTCUSDT',
+        'last': Decimal('50000'),
+        'bid': Decimal('49990'),
+        'ask': Decimal('50010'),
+        'timestamp': int(datetime.utcnow().timestamp() * 1000)
+    })
+    
+    client.get_ticker = AsyncMock(return_value={
         'symbol': 'BTCUSDT',
         'last': Decimal('50000'),
         'bid': Decimal('49990'),
@@ -661,7 +727,7 @@ class TestStatusAndMonitoring:
         assert 'performance' in status
         
         assert status['system']['running'] is False  # Not started yet
-        assert 'CORE_HODL' in status['engines']
+        assert 'core_hodl' in status['engines']
     
     @pytest.mark.asyncio
     async def test_get_system_state(self, trading_engine):
