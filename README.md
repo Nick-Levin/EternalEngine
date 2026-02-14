@@ -14,7 +14,7 @@
   <a href="#key-features">Features</a> •
   <a href="#quick-start">Quick Start</a> •
   <a href="#performance-projections">Performance</a> •
-  <a href="#documentation">Documentation</a> •
+  <a href="#documentation">Documentation</a>
 </p>
 
 ---
