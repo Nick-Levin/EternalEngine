@@ -1,0 +1,671 @@
+# The Eternal Engine - AI Assistant Rules
+# ========================================
+# This file guides AI assistants (Cursor, Claude, etc.) when editing code
+# for The Eternal Engine autonomous crypto trading system.
+#
+# CRITICAL: Read and follow ALL rules in this file before making changes.
+# When in doubt, ask for clarification rather than risk violating safety rules.
+
+# =============================================================================
+# 1. PROJECT CONTEXT
+# =============================================================================
+
+project:
+  name: "The Eternal Engine"
+  description: "Autonomous crypto trading system with 4-engine multi-strategy architecture"
+  type: "algorithmic_trading_bot"
+  
+  architecture:
+    engine_1: "CORE-HODL (60%) - Long-term BTC/ETH accumulation with quarterly rebalancing"
+    engine_2: "TREND (20%) - Dual momentum trend following with crisis alpha"
+    engine_3: "FUNDING (15%) - Delta-neutral funding rate arbitrage"
+    engine_4: "TACTICAL (5%) - Extreme value deployment during crashes"
+  
+  execution_venue: "Bybit (API V5, Unified Trading Account)"
+  primary_assets: ["BTC", "ETH"]
+  time_horizon: "20+ years autonomous operation"
+
+# =============================================================================
+# 2. CRITICAL RULES - NEVER VIOLATE (SAFETY-CRITICAL)
+# =============================================================================
+
+critical_rules:
+  # Rule 2.1: Decimal for ALL monetary calculations
+  - rule: "Use Decimal for ALL monetary calculations"
+    severity: "CRITICAL"
+    description: "NEVER use float for money. Always use Decimal from the standard library."
+    examples:
+      good: |
+        from decimal import Decimal
+        profit = Decimal("150.50") * quantity  # Always use string constructor
+        stop_loss = entry_price * (Decimal("1") - Decimal("0.02"))
+      bad: |
+        profit = 150.50 * quantity  # NEVER - float precision errors
+        stop_loss = entry_price * 0.98  # NEVER - implicit float
+    rationale: "Float rounding errors can cause significant financial discrepancies"
+
+  # Rule 2.2: All exchange operations must be async
+  - rule: "All exchange operations must be async"
+    severity: "CRITICAL"
+    description: "All I/O operations, especially exchange API calls, must use async/await"
+    examples:
+      good: |
+        async def fetch_balance(self) -> Portfolio:
+            balance = await self.exchange.fetch_balance()
+            return self._parse_balance(balance)
+      bad: |
+        def fetch_balance(self):  # NEVER - blocks event loop
+            return self.exchange.fetch_balance()
+    rationale: "Blocking calls freeze the entire trading engine, missing opportunities"
+
+  # Rule 2.3: All signals must pass risk_manager.check_signal()
+  - rule: "All signals must pass risk_manager.check_signal()"
+    severity: "CRITICAL"
+    description: "Every trading signal must be validated by RiskManager before execution"
+    examples:
+      good: |
+        risk_check = self.risk_manager.check_signal(signal, portfolio, positions)
+        if risk_check.passed:
+            await self.execute_signal(signal)
+        else:
+            logger.warning("signal_rejected", reason=risk_check.reason)
+      bad: |
+        await self.execute_signal(signal)  # NEVER - bypasses risk checks
+    rationale: "Bypassing risk checks can lead to catastrophic losses"
+
+  # Rule 2.4: Position sizing must use 1/8 Kelly formula
+  - rule: "Position sizing must use 1/8 Kelly formula"
+    severity: "CRITICAL"
+    description: "Position sizes must use fractional Kelly (1/8 Kelly) sizing"
+    formula: |
+      kelly_fraction = (p × b - q) / b  # where p=win_rate, b=win/loss_ratio, q=1-p
+      adjusted_kelly = kelly_fraction × 0.125  # 1/8 Kelly
+      max_position_pct = 5%  # Hard cap regardless of Kelly
+    examples:
+      good: |
+        def calculate_position_size(self, account_value, win_rate=0.4, avg_win_loss=2.5):
+            p, b = win_rate, avg_win_loss
+            kelly = (b * p - (1 - p)) / b
+            position_pct = min(kelly * 0.125, Decimal("0.05"))
+            return account_value * position_pct
+      bad: |
+        position_size = account_value * 0.5  # NEVER - 50% in one trade
+    rationale: "1/8 Kelly prevents ruin while allowing growth. Full Kelly is too volatile"
+
+  # Rule 2.5: Never expose API keys
+  - rule: "Never expose API keys"
+    severity: "CRITICAL"
+    description: "API keys must NEVER be hardcoded, logged, or exposed in any way"
+    requirements:
+      - "Load from environment variables only"
+      - "Use .env files (never commit to git)"
+      - "Mask in all logs (show only first/last 4 chars if needed)"
+      - "Never include in error messages"
+    examples:
+      good: |
+        api_key = os.getenv("BYBIT_API_KEY")
+        logger.info("api_configured", key_mask=f"{api_key[:4]}...{api_key[-4:]}")
+      bad: |
+        API_KEY = "a1b2c3d4e5f6..."  # NEVER - hardcoded
+        logger.error("auth_failed", api_key=api_key)  # NEVER - logs full key
+    rationale: "Exposed API keys can lead to complete account drain within seconds"
+
+  # Rule 2.6: Subaccount isolation mandatory
+  - rule: "Subaccount isolation mandatory"
+    severity: "CRITICAL"
+    description: "Each engine must operate in isolated subaccounts"
+    structure:
+      CORE_HODL: "Subaccount: CORE - Spot only, no leverage"
+      TREND: "Subaccount: TREND-1, TREND-2 - Max 2x leverage"
+      FUNDING: "Subaccount: FUNDING - Delta-neutral pairs"
+      TACTICAL: "Subaccount: TACTICAL - Spot deployment only"
+    rationale: "Prevents failure in one engine from contaminating others"
+
+  # Rule 2.7: Circuit breaker levels
+  - rule: "Circuit breaker levels: 10%, 15%, 20%, 25% drawdowns"
+    severity: "CRITICAL"
+    description: "Four-level circuit breaker system with mandatory actions"
+    levels:
+      level_1_10pct:
+        action: "Reduce sizes 25%, widen stops, pause TACTICAL 24h"
+        recovery: "Auto when within 5% of ATH"
+      level_2_15pct:
+        action: "Reduce sizes 50%, close 50% losing TREND, halt 72h"
+        recovery: "Manual approval required"
+      level_3_20pct:
+        action: "Close ALL TREND/FUNDING, 50% CORE to Earn, halt indefinitely"
+        recovery: "Manual review + strategy audit + gradual restart at 25%"
+      level_4_25pct:
+        action: "FULL LIQUIDATION to USDT, transfer to Earn, permanent halt"
+        recovery: "Full forensic audit + dual-auth required to restart"
+    rationale: "Automatic capital preservation prevents catastrophic drawdowns"
+
+# =============================================================================
+# 3. CODE QUALITY RULES
+# =============================================================================
+
+code_quality:
+  # Rule 3.1: Type hints for all functions
+  - rule: "Use type hints for all functions"
+    severity: "HIGH"
+    examples:
+      good: |
+        from decimal import Decimal
+        from typing import List, Optional, Dict
+        
+        async def calculate_position_size(
+            self,
+            portfolio_value: Decimal,
+            entry_price: Decimal,
+            stop_price: Optional[Decimal] = None
+        ) -> Decimal:
+            ...
+      bad: |
+        def calculate_position_size(self, portfolio_value, entry_price, stop_price=None):
+            ...  # Missing type hints
+
+  # Rule 3.2: Use structlog (never print)
+  - rule: "Use structlog for all logging (never print)"
+    severity: "HIGH"
+    examples:
+      good: |
+        import structlog
+        logger = structlog.get_logger(__name__)
+        
+        logger.info("order_executed", symbol=symbol, size=str(size), price=str(price))
+        logger.error("api_error", error=str(e), retry_count=retry_count)
+      bad: |
+        print(f"Order executed: {symbol}")  # NEVER - use logger
+        print(f"Error: {e}")  # NEVER - unstructured logging
+
+  # Rule 3.3: All I/O operations must be async
+  - rule: "All I/O operations must be async"
+    severity: "HIGH"
+    applies_to:
+      - "Exchange API calls"
+      - "Database operations"
+      - "File system operations"
+      - "Network requests"
+      - "WebSocket operations"
+
+  # Rule 3.4: Validate all inputs from exchange API
+  - rule: "Validate all inputs from exchange API"
+    severity: "HIGH"
+    examples:
+      good: |
+        def parse_orderbook(self, data: dict) -> OrderBook:
+            assert "bids" in data, "Missing bids in orderbook"
+            assert "asks" in data, "Missing asks in orderbook"
+            assert len(data["bids"]) > 0, "Empty bids"
+            return OrderBook(
+                bids=[Decimal(str(p)) for p, q in data["bids"]],
+                asks=[Decimal(str(p)) for p, q in data["asks"]]
+            )
+      bad: |
+        return OrderBook(bids=data["bids"], asks=data["asks"])  # No validation
+
+  # Rule 3.5: Handle exceptions gracefully
+  - rule: "Handle exceptions gracefully"
+    severity: "HIGH"
+    requirements:
+      - "Never catch bare Exception without logging"
+      - "Always log full error context"
+      - "Use specific exception types where possible"
+      - "Implement retry logic with exponential backoff for transient errors"
+    examples:
+      good: |
+        try:
+            await self.exchange.create_order(...)
+        except ccxt.NetworkError as e:
+            logger.warning("network_error", error=str(e), attempt=attempt)
+            await asyncio.sleep(2 ** attempt)
+        except ccxt.ExchangeError as e:
+            logger.error("exchange_error", error=str(e))
+            raise  # Propagate non-transient errors
+
+# =============================================================================
+# 4. FILE PATTERNS
+# =============================================================================
+
+file_patterns:
+  include:
+    - "*.py"           # Python source files
+    - "*.md"           # Documentation
+    - "*.yaml"         # Configuration files
+    - "*.yml"          # Configuration files
+    - ".env*"          # Environment files (NEVER commit)
+  
+  exclude_from_linting:
+    - "venv/**"
+    - ".venv/**"
+    - "__pycache__/**"
+    - "*.pyc"
+    - "logs/**"
+    - "data/backups/**"
+
+# =============================================================================
+# 5. STYLE GUIDE
+# =============================================================================
+
+style_guide:
+  formatter: "Black"
+  line_length: 100
+  import_sorter: "isort"
+  
+  naming_conventions:
+    classes: "PascalCase"
+    functions: "snake_case"
+    variables: "snake_case"
+    constants: "UPPER_SNAKE_CASE"
+    private: "_leading_underscore"
+    protected: "_leading_underscore"
+  
+  docstrings: "Google style"
+  docstring_example: |
+    """Calculate position size using fractional Kelly criterion.
+    
+    Uses 1/8 Kelly to balance growth with drawdown protection.
+    Position size is capped at 5% of portfolio regardless of Kelly.
+    
+    Args:
+        portfolio_value: Total portfolio value in USDT
+        entry_price: Entry price for the position
+        stop_price: Stop loss price (optional, uses default if None)
+        win_rate: Historical win rate for this strategy (default: 0.4)
+        win_loss_ratio: Average win/loss ratio (default: 2.5)
+    
+    Returns:
+        Decimal: Position size in base currency
+    
+    Raises:
+        ValueError: If portfolio_value <= 0 or entry_price <= 0
+    
+    Example:
+        >>> size = calculator.calculate_position_size(
+        ...     portfolio_value=Decimal("100000"),
+        ...     entry_price=Decimal("50000"),
+        ...     stop_price=Decimal("48000")
+        ... )
+        >>> print(size)
+        Decimal('0.052')
+    """
+
+# =============================================================================
+# 6. ENGINE IMPLEMENTATION TEMPLATE
+# =============================================================================
+
+engine_template: |
+  """Template for implementing a new strategy engine.
+  
+  All engines MUST inherit from BaseStrategy and implement the following:
+  """
+  from decimal import Decimal
+  from typing import List, Dict, Any
+  import structlog
+  
+  from src.strategies.base import BaseStrategy
+  from src.core.models import MarketData, TradingSignal, SignalType
+  from src.risk.risk_manager import RiskManager
+  
+  logger = structlog.get_logger(__name__)
+  
+  
+  class MyNewStrategy(BaseStrategy):
+      """Description of the strategy."""
+      
+      def __init__(
+          self,
+          symbols: List[str],
+          risk_manager: RiskManager,
+          # Add strategy-specific parameters here
+          **kwargs
+      ):
+          super().__init__(name="MyNewStrategy", symbols=symbols, **kwargs)
+          self.risk_manager = risk_manager
+          # Initialize strategy-specific state
+          
+      async def analyze(
+          self,
+          data: Dict[str, List[MarketData]]
+      ) -> List[TradingSignal]:
+          """Analyze market data and generate trading signals.
+          
+          Args:
+              data: Dictionary mapping symbol to list of MarketData
+              
+          Returns:
+              List of TradingSignal objects
+          """
+          signals = []
+          
+          for symbol, bars in data.items():
+              if len(bars) < self.get_required_data()['min_bars']:
+                  continue
+              
+              # Calculate indicators
+              # Generate signals based on strategy logic
+              
+              if self._should_enter_long(bars):
+                  signal = self._create_long_signal(symbol, bars[-1])
+                  signals.append(signal)
+          
+          return signals
+      
+      async def on_order_filled(
+          self,
+          symbol: str,
+          side: str,
+          amount: Decimal,
+          price: Decimal
+      ):
+          """Handle order fill event.
+          
+          Args:
+              symbol: Trading pair symbol
+              side: 'buy' or 'sell'
+              amount: Filled amount
+              price: Fill price
+          """
+          self.trades_executed += 1
+          logger.info(
+              "order_filled",
+              symbol=symbol,
+              side=side,
+              amount=str(amount),
+              price=str(price)
+          )
+          # Update strategy state based on fill
+      
+      async def on_position_closed(
+          self,
+          symbol: str,
+          pnl: Decimal,
+          pnl_pct: Decimal
+      ):
+          """Handle position close event.
+          
+          Args:
+              symbol: Trading pair symbol
+              pnl: Realized PnL in USDT
+              pnl_pct: Realized PnL percentage
+          """
+          self.total_pnl += pnl
+          logger.info(
+              "position_closed",
+              symbol=symbol,
+              pnl=str(pnl),
+              pnl_pct=f"{pnl_pct:.2f}%"
+          )
+          # Update strategy statistics
+      
+      def _calculate_atr(
+          self,
+          bars: List[MarketData],
+          period: int = 14
+      ) -> Decimal:
+          """Calculate Average True Range for stop placement."""
+          if len(bars) < period + 1:
+              return Decimal("0")
+          
+          tr_values = []
+          for i in range(1, len(bars)):
+              high_low = bars[i].high - bars[i].low
+              high_close = abs(bars[i].high - bars[i-1].close)
+              low_close = abs(bars[i].low - bars[i-1].close)
+              tr_values.append(max(high_low, high_close, low_close))
+          
+          # Use Decimal arithmetic
+          atr = sum(tr_values[-period:]) / Decimal(period)
+          return atr
+      
+      def _calculate_position_size_with_atr(
+          self,
+          portfolio_value: Decimal,
+          entry_price: Decimal,
+          atr: Decimal,
+          risk_pct: Decimal = Decimal("0.01")  # 1% risk
+      ) -> Decimal:
+          """Calculate position size using ATR-based stop.
+          
+          Uses 2x ATR for stop distance by default.
+          Position sized so that 1% of portfolio is risked.
+          """
+          stop_distance = atr * Decimal("2")
+          if stop_distance <= 0:
+              return Decimal("0")
+          
+          risk_amount = portfolio_value * risk_pct
+          position_size = risk_amount / stop_distance
+          
+          # Apply Kelly sizing (1/8 Kelly)
+          position_size = self.risk_manager.apply_kelly_sizing(
+              position_size, portfolio_value
+          )
+          
+          return position_size
+
+# =============================================================================
+# 7. REVIEW CHECKLIST
+# =============================================================================
+
+review_checklist:
+  before_commit:
+    - command: "python main.py --check"
+      description: "Validate configuration and basic functionality"
+      must_pass: true
+    
+    - command: "pytest"
+      description: "Run all unit and integration tests"
+      must_pass: true
+    
+    - command: "black --check --line-length 100 ."
+      description: "Check code formatting"
+      must_pass: true
+    
+    - command: "isort --check-only ."
+      description: "Check import sorting"
+      must_pass: true
+  
+  manual_checks:
+    - item: "No API keys in code"
+      verification: "grep -r 'api_key\|api_secret\|apikey\|apisecret' --include='*.py' | grep -v '.env' | grep -v 'os.getenv' | grep -v 'getenv'"
+      must_pass: true
+    
+    - item: "All monetary values use Decimal"
+      verification: "Check for float() conversions of monetary values"
+      must_pass: true
+    
+    - item: "Risk checks in place"
+      verification: "All signal generation paths lead to risk_manager.check_signal()"
+      must_pass: true
+    
+    - item: "Async/await used for I/O"
+      verification: "No blocking I/O calls in async functions"
+      must_pass: true
+    
+    - item: "structlog used (no print statements)"
+      verification: "grep -r 'print(' --include='*.py' src/"
+      must_pass: true
+
+# =============================================================================
+# 8. DANGER ZONES - EXTRA CAUTION REQUIRED
+# =============================================================================
+
+danger_zones:
+  files:
+    - path: "src/risk/risk_manager.py"
+      risk_level: "CRITICAL"
+      description: "All safety controls - circuit breakers, position limits, emergency stops"
+      rules:
+        - "NEVER disable circuit breakers"
+        - "NEVER increase position limits above 5%"
+        - "NEVER reduce drawdown thresholds"
+        - "ALWAYS maintain emergency stop functionality"
+      approval_required: "Dual authorization for any changes"
+    
+    - path: "src/exchange/bybit_client.py"
+      risk_level: "CRITICAL"
+      description: "Order creation and exchange interaction"
+      rules:
+        - "NEVER remove paper trading guards"
+        - "ALWAYS validate order parameters"
+        - "ALWAYS use proper error handling"
+        - "NEVER bypass rate limiting"
+      approval_required: "Risk manager review required"
+    
+    - path: "src/core/config.py"
+      risk_level: "HIGH"
+      description: "System configuration and parameters"
+      rules:
+        - "NEVER increase leverage above 2x"
+        - "NEVER increase max_position_pct above 5%"
+        - "Circuit breaker thresholds must be maintained"
+      approval_required: "Risk manager review required"
+  
+  operations:
+    - action: "Circuit breaker override"
+      risk_level: "CRITICAL"
+      description: "Manually overriding circuit breakers"
+      rules:
+        - "NEVER override without written justification"
+        - "Requires dual authorization"
+        - "Must be documented in incident log"
+        - "Maximum override duration: 4 hours"
+    
+    - action: "Position sizing changes"
+      risk_level: "CRITICAL"
+      description: "Changing position sizing formulas"
+      rules:
+        - "NEVER increase Kelly fraction above 1/8"
+        - "Requires backtesting validation"
+        - "Risk manager approval required"
+    
+    - action: "Leverage changes > 2x"
+      risk_level: "CRITICAL"
+      description: "Increasing leverage beyond 2x"
+      rules:
+        - "ABSOLUTELY PROHIBITED"
+        - "No exceptions under any circumstances"
+        - "System is designed for max 2x leverage"
+
+# =============================================================================
+# 9. DOCUMENTATION REFERENCES
+# =============================================================================
+
+documentation:
+  overview:
+    path: "docs/01-executive-summary/"
+    description: "High-level project overview and investment thesis"
+  
+  architecture:
+    path: "docs/03-system-architecture/"
+    description: "Technical architecture and 4-engine design"
+    key_files:
+      - "01-technical-overview.md"
+  
+  strategies:
+    path: "docs/04-trading-strategies/"
+    description: "Strategy specifications and implementation details"
+    key_files:
+      - "01-strategy-specifications.md"
+  
+  risk_management:
+    path: "docs/05-risk-management/"
+    description: "Risk framework, position sizing, circuit breakers"
+    key_files:
+      - "01-risk-framework.md"
+  
+  infrastructure:
+    path: "docs/06-infrastructure/"
+    description: "Bybit integration, API details, execution"
+    key_files:
+      - "01-bybit-integration.md"
+  
+  monitoring:
+    path: "docs/07-monitoring-governance/"
+    description: "Monitoring framework and governance"
+  
+  implementation:
+    path: "docs/09-implementation/"
+    description: "Implementation roadmap and timeline"
+
+# =============================================================================
+# 10. EMERGENCY PROCEDURES
+# =============================================================================
+
+emergency_procedures:
+  circuit_breaker_triggered:
+    severity: "HIGH"
+    steps:
+      1: "Halt all trading immediately (automatic)"
+      2: "Preserve all logs and state"
+      3: "Notify operator via all channels"
+      4: "Investigate root cause"
+      5: "Manual reset required before resuming"
+    
+  suspected_bug:
+    severity: "CRITICAL"
+    steps:
+      1: "STOP TRADING IMMEDIATELY"
+      2: "Preserve logs/data directory"
+      3: "Document observed behavior"
+      4: "Contact technical lead"
+      5: "DO NOT RESUME until bug is identified and fixed"
+    
+  exchange_api_failure:
+    severity: "HIGH"
+    steps:
+      1: "Pause new order submission"
+      2: "Monitor existing positions"
+      3: "Implement exponential backoff for retries"
+      4: "Alert operator after 3 failed attempts"
+      5: "Consider manual intervention if positions at risk"
+    
+  unexpected_large_loss:
+    severity: "CRITICAL"
+    steps:
+      1: "STOP ALL TRADING IMMEDIATELY"
+      2: "Verify position states vs exchange"
+      3: "Check for unexpected market events"
+      4: "Review all recent trades"
+      5: "Risk manager review required before restart"
+
+# =============================================================================
+# AI ASSISTANT BEHAVIOR GUIDELINES
+# =============================================================================
+
+ai_behavior:
+  # When suggesting changes:
+  - "ALWAYS prioritize safety over features"
+  - "NEVER suggest bypassing risk controls"
+  - "ALWAYS consider the 4-engine architecture"
+  - "Verify all monetary calculations use Decimal"
+  - "Ensure async/await is used for I/O"
+  - "Check that risk_manager.check_signal() is called"
+  
+  # When asked to implement features:
+  - "Ask clarifying questions about risk implications"
+  - "Suggest safer alternatives if appropriate"
+  - "Reference the documentation in docs/"
+  - "Follow the engine implementation template"
+  - "Include proper error handling"
+  
+  # When reviewing code:
+  - "Check for critical rule violations first"
+  - "Verify Decimal usage for all money"
+  - "Confirm async patterns are correct"
+  - "Validate risk check integration"
+  - "Ensure no API keys are exposed"
+  
+  # When in doubt:
+  - "Ask for clarification rather than assume"
+  - "Default to the safest implementation"
+  - "Reference existing code patterns in src/"
+  - "Consult the danger zones section"
+
+# =============================================================================
+# END OF CURSORRULES
+# =============================================================================
+# Remember: This system manages real money. Safety > Speed > Features.
+# When in doubt, ask. When certain, verify. When wrong, stop immediately.
+# =============================================================================
