@@ -19,7 +19,7 @@
 
 ---
 
-# 📋 Overview
+# Overview
 
 **The Eternal Engine** is a fully autonomous cryptocurrency trading system designed for decades-long wealth compounding. Built specifically for Bybit's institutional-grade infrastructure, it combines four distinct trading engines—each optimized for different market conditions—to deliver consistent, risk-adjusted returns while you sleep.
 
@@ -37,7 +37,7 @@
 
 ---
 
-# 🔥 The Four Engines
+# The Four Engines
 
 The Eternal Engine deploys capital across four autonomous engines, each designed to thrive in different market regimes:
 
@@ -99,7 +99,7 @@ The Eternal Engine deploys capital across four autonomous engines, each designed
 
 ---
 
-# ⚡ Key Features
+# Key Features
 
 ## Academic Foundation
 - **140 years** of trend following evidence (Moskowitz et al., AQR)
@@ -134,7 +134,7 @@ Mathematically impossible to suffer ruin. Provides 90% reduction in drawdowns vs
 
 ---
 
-# 🚀 Quick Start
+# Quick Start
 
 ## Prerequisites
 
@@ -236,7 +236,7 @@ python main.py
 
 ---
 
-# 📊 Performance Projections
+# Performance Projections
 
 ## Scenario Analysis ($100,000 Initial + $500/Month)
 
@@ -271,7 +271,7 @@ python main.py
 
 ---
 
-# 📚 Documentation
+# Documentation
 
 The Eternal Engine includes **~12,500 lines** of professional documentation across 10 comprehensive sections:
 
