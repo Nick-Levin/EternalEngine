@@ -1,0 +1,37 @@
+engine:
+  name: TREND
+  enabled: true
+  allocation_pct: 20
+  subaccount: TREND-1
+  
+markets:
+  - symbol: BTCUSDT
+    allocation_pct: 60
+  - symbol: ETHUSDT
+    allocation_pct: 40
+
+indicators:
+  ema_fast_period: 50
+  ema_slow_period: 200
+  adx_period: 14
+  adx_threshold: 25
+  atr_period: 14
+
+entry_rules:
+  long:
+    - price_above_200sma
+    - ema_fast_above_slow
+    - adx_above_threshold
+    - volume_above_average
+
+exit_rules:
+  long_exit: price_closes_below_200sma
+  trailing_stop:
+    enabled: true
+    activation_r: 1.0
+    distance_atr: 3.0
+
+risk:
+  max_leverage: 2.0
+  risk_per_trade_pct: 1.0
+  max_position_pct: 50  # Of engine capital

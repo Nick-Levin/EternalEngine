@@ -149,23 +149,29 @@ Mathematically impossible to suffer ruin. Provides 90% reduction in drawdowns vs
 git clone https://github.com/Nick-Levin/BybitTrader.git
 cd BybitTrader
 
+# Run the automated setup script
+chmod +x scripts/setup.sh
+./scripts/setup.sh
+```
+
+Or manual installation:
+
+```bash
 # Create virtual environment
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
-```
 
-## Configuration
-
-```bash
 # Copy example environment file
 cp .env.example .env
 
 # Edit .env with your credentials
 nano .env
 ```
+
+## Configuration
 
 Configure your `.env` file:
 
@@ -325,7 +331,7 @@ docs/
 
 ---
 
-# 🏗️ Project Structure
+# Project Structure
 
 ```
 BybitTrader/
@@ -383,7 +389,7 @@ BybitTrader/
 
 ---
 
-# ⚙️ Requirements
+# Requirements
 
 ## System Requirements
 
@@ -412,7 +418,7 @@ See [requirements.txt](./requirements.txt) for complete list.
 
 ---
 
-# 🛡️ Security Best Practices
+# Security Best Practices
 
 1. **Use Testnet First:** Always test on Bybit testnet before live trading
 2. **IP Whitelisting:** Restrict API keys to your server IP address
@@ -423,7 +429,7 @@ See [requirements.txt](./requirements.txt) for complete list.
 
 ---
 
-# ⚠️ Risk Warning
+# Risk Warning
 
 **CRYPTOCURRENCY TRADING INVOLVES SUBSTANTIAL RISK OF LOSS AND IS NOT SUITABLE FOR ALL INVESTORS.**
 
@@ -450,7 +456,7 @@ Before using The Eternal Engine, ensure you:
 
 ---
 
-# 📈 Monitoring & Operations
+# Monitoring & Operations
 
 ### Check System Status
 
@@ -476,7 +482,7 @@ tail -f logs/trading_bot.log | jq .
 
 ---
 
-# 🤝 Contributing
+# Contributing
 
 This is a sophisticated trading system. Contributions are welcome but require:
 - Thorough testing on testnet
@@ -486,13 +492,13 @@ This is a sophisticated trading system. Contributions are welcome but require:
 
 ---
 
-# 📜 License
+# License
 
 **MIT License** - See [LICENSE](./LICENSE) file for details.
 
 ---
 
-# 📞 Support & Community
+# Support & Community
 
 - **Documentation:** See [docs/](./docs/) folder for comprehensive guides
 - **Issues:** Use GitHub Issues for bug reports

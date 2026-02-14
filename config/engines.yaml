@@ -1,0 +1,24 @@
+# Master configuration for all engines
+defaults:
+  trading_mode: paper
+  default_symbols: [BTCUSDT, ETHUSDT]
+
+engines:
+  core_hodl:
+    config_file: core_hodl.yaml
+    priority: 1
+  trend:
+    config_file: trend.yaml
+    priority: 2
+  funding:
+    config_file: funding.yaml
+    priority: 3
+  tactical:
+    config_file: tactical.yaml
+    priority: 4
+
+capital_allocation:
+  core_hodl: 60
+  trend: 20
+  funding: 15
+  tactical: 5

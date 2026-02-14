@@ -1,0 +1,31 @@
+engine:
+  name: TACTICAL
+  enabled: true
+  allocation_pct: 5
+  subaccount: TACTICAL
+
+triggers:
+  drawdown:
+    level_1:
+      drawdown_pct: -50
+      deploy_pct: 50
+    level_2:
+      drawdown_pct: -70
+      deploy_pct: 50
+  fear_greed:
+    extreme_fear_threshold: 20
+  funding:
+    deeply_negative_threshold: -0.05
+    min_consecutive_days: 3
+
+deployment:
+  primary_asset: BTC
+  primary_allocation: 80
+  secondary_asset: ETH
+  secondary_allocation: 20
+  execution: immediate_market
+
+exit_rules:
+  profit_target_pct: 100
+  max_hold_days: 365
+  return_to_core: true

@@ -1,0 +1,31 @@
+engine:
+  name: CORE-HODL
+  enabled: true
+  allocation_pct: 60
+  subaccount: CORE-HODL
+  
+assets:
+  btc:
+    target_pct: 66.7  # Of CORE allocation
+    min_pct: 55
+    max_pct: 80
+    symbol: BTCUSDT
+  eth:
+    target_pct: 33.3
+    min_pct: 20
+    max_pct: 45
+    symbol: ETHUSDT
+
+strategy:
+  type: dca_rebalance
+  dca:
+    enabled: true
+    interval_hours: 24
+    amount_usdt: 100
+  rebalancing:
+    frequency: quarterly
+    threshold_pct: 10
+    
+yield:
+  eth_staking_enabled: true
+  min_apy_pct: 2.0

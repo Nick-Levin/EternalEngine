@@ -38,13 +38,37 @@
 
 ---
 
+## Quick Installation (One-Liner)
+
+The fastest way to get started:
+
+```bash
+# Clone and setup in one go
+git clone https://github.com/Nick-Levin/BybitTrader.git
+cd BybitTrader
+chmod +x scripts/setup.sh
+./scripts/setup.sh
+```
+
+This will:
+- ✅ Check Python version (3.11+)
+- ✅ Create virtual environment
+- ✅ Install all dependencies
+- ✅ Create necessary directories (logs, data, config)
+- ✅ Copy `.env.example` to `.env`
+- ✅ Prompt for API keys (or use DEMO keys)
+- ✅ Initialize the database
+- ✅ Run configuration check
+
+---
+
 ## Step 1: Clone and Setup (5 minutes)
 
 ### 1.1 Clone the Repository
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/eternal-engine.git
-cd eternal-engine
+git clone https://github.com/Nick-Levin/BybitTrader.git
+cd BybitTrader
 
 # Or download and extract the ZIP
 ```
@@ -249,9 +273,14 @@ MAX_CONCURRENT_POSITIONS=5
 
 ---
 
-## Step 4: Verify Setup (2 minutes)
+## Step 4: First Run (2 minutes)
 
-### 4.1 Run Configuration Check
+### 4.1 Initialize Database
+```bash
+python main.py --init-db
+```
+
+### 4.2 Run Configuration Check
 ```bash
 python main.py --check
 ```
@@ -264,7 +293,7 @@ python main.py --check
   - Risk parameters within bounds
 ```
 
-### 4.2 Test API Connectivity
+### 4.3 Test API Connectivity
 ```bash
 # Run in paper mode to test connectivity
 python main.py --mode paper
@@ -277,29 +306,51 @@ python main.py --mode paper
 
 **Press Ctrl+C to exit after confirming connectivity**
 
-### 4.3 Validate Subaccounts (If using multiple)
-```bash
-# Check each subaccount balance
-python scripts/check_subaccounts.py
-```
+---
+
+## Step 5: Understanding the 4 Engines
+
+### CORE-HODL (60% of capital)
+- **What it does:** Buys and holds BTC/ETH
+- **When it works:** Always - long term wealth accumulation
+- **Risk level:** Minimal
+- **Typical activity:** DCA purchases, quarterly rebalancing
+
+### TREND (20% of capital)
+- **What it does:** Follows market trends with leverage
+- **When it works:** Strong directional markets
+- **Risk level:** Moderate
+- **Typical activity:** Enters on 50/200 SMA crossovers, exits on reversals
+
+### FUNDING (15% of capital)
+- **What it does:** Market-neutral arbitrage between spot and futures
+- **When it works:** When funding rates are positive
+- **Risk level:** Low
+- **Typical activity:** Collects funding payments every 8 hours
+
+### TACTICAL (5% of capital)
+- **What it does:** Waits for market crashes to deploy capital
+- **When it works:** During major drawdowns (-50% to -70%)
+- **Risk level:** Opportunistic
+- **Typical activity:** Mostly idle, deploys on extreme fear
 
 ---
 
-## Step 5: Paper Trading (START HERE!)
+## Step 6: Paper Trading (START HERE!)
 
-### 5.1 Enable Bybit Demo Trading
+### 6.1 Enable Bybit Demo Trading
 1. Log in to Bybit
 2. Go to **Trade** → **Demo Trading**
 3. Claim demo funds (usually 100,000 USDT)
 4. Use demo trading API keys in `.env`
 
-### 5.2 Run Paper Trading Mode
+### 6.2 Run Paper Trading Mode
 ```bash
 # Run the bot in paper trading mode
 python main.py --mode paper
 ```
 
-### 5.3 Monitor Paper Trading
+### 6.3 Monitor Paper Trading
 **Check the logs:**
 ```bash
 tail -f logs/trading_bot.log
@@ -311,7 +362,7 @@ tail -f logs/trading_bot.log
 - Orders are placed (simulated or real in demo)
 - Logs show regular heartbeat/status updates
 
-### 5.4 Paper Trading Checklist
+### 6.4 Paper Trading Checklist
 
 Run paper trading for **at least 1-2 weeks** and verify:
 
@@ -323,20 +374,11 @@ Run paper trading for **at least 1-2 weeks** and verify:
 - [ ] Circuit breaker logic responds correctly
 - [ ] You understand the daily P&L reports
 
-### 5.5 Common Paper Trading Issues
-
-| Issue | Solution |
-|-------|----------|
-| "API key invalid" | Check testnet vs mainnet setting |
-| "Insufficient balance" | Claim demo funds on Bybit |
-| "Rate limit exceeded" | Reduce polling frequency in config |
-| "Connection timeout" | Check internet connection, retry |
-
 ---
 
-## Step 6: Go Live (When Ready)
+## Step 7: Go Live (When Ready)
 
-### 6.1 Pre-Flight Checklist
+### 7.1 Pre-Flight Checklist
 
 **DO NOT SKIP THIS:**
 
@@ -348,7 +390,7 @@ Run paper trading for **at least 1-2 weeks** and verify:
 - [ ] You accept that 35%+ drawdowns are possible
 - [ ] You have 6+ months living expenses saved separately
 
-### 6.2 Start Small
+### 7.2 Start Small
 
 **Begin with minimal capital:**
 1. Transfer only $5,000-$10,000 to live subaccounts
@@ -356,7 +398,7 @@ Run paper trading for **at least 1-2 weeks** and verify:
 3. Monitor daily during first week
 4. Gradually increase capital as confidence builds
 
-### 6.3 Switch to Live Trading
+### 7.3 Switch to Live Trading
 ```bash
 # Edit .env
 TRADING_MODE=live
@@ -368,7 +410,7 @@ python main.py --mode live
 
 **⚠️ WARNING: This will use REAL money!**
 
-### 6.4 Initial Live Monitoring
+### 7.4 Initial Live Monitoring
 
 **First Week - Daily Checks:**
 ```bash
@@ -387,7 +429,7 @@ tail -f logs/trading_bot.log
 - Failed orders or errors
 - Drawdown approaching 10% (first circuit breaker)
 
-### 6.5 Gradual Scaling
+### 7.5 Gradual Scaling
 
 | Phase | Capital | Monitoring Frequency | Duration |
 |-------|---------|---------------------|----------|
@@ -398,7 +440,7 @@ tail -f logs/trading_bot.log
 
 ---
 
-## 🛠️ Common Commands
+## 🛠️ Monitoring the System
 
 ### Basic Operations
 ```bash
@@ -534,11 +576,6 @@ cp trading_bot.db trading_bot_backup.db
 1. **Full Documentation**: Read the complete [docs/](docs/) folder
 2. **Risk Management**: Study [docs/05-risk-management/](docs/05-risk-management/)
 3. **Strategy Details**: Review [docs/04-trading-strategies/](docs/04-trading-strategies/)
-
-### Join the Community
-- Discord: [Link if available]
-- Telegram Group: [Link if available]
-- GitHub Discussions: [Link if available]
 
 ### Advanced Configuration
 1. **Custom Strategies**: See [docs/10-appendices/03-configuration-examples.md](docs/10-appendices/03-configuration-examples.md)

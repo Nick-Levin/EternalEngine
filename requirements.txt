@@ -1,37 +1,83 @@
-# Core dependencies
-ccxt>=4.2.0
-websockets>=12.0
-aiohttp>=3.9.0
-asyncio-mqtt>=0.16.0
+# The Eternal Engine - Requirements
+# 4-strategy autonomous trading system for Bybit
 
-# Data processing
-pandas>=2.1.0
-numpy>=1.24.0
+# =============================================================================
+# CORE DEPENDENCIES
+# =============================================================================
+ccxt>=4.2.0                    # Exchange API integration (Bybit)
+websockets>=12.0               # Real-time WebSocket data feeds
+aiohttp>=3.9.0                 # Async HTTP client/server
+aiofiles>=23.2.0               # Async file operations
+asyncio-mqtt>=0.16.0           # MQTT for external signals (optional)
 
-# Configuration & Environment
-python-dotenv>=1.0.0
-pydantic>=2.5.0
-pydantic-settings>=2.1.0
+# =============================================================================
+# DATA PROCESSING
+# =============================================================================
+pandas>=2.1.0                  # Data manipulation and analysis
+numpy>=1.24.0                  # Numerical computing
 
-# Database
-SQLAlchemy>=2.0.0
-aiosqlite>=0.19.0
+# =============================================================================
+# CONFIGURATION & ENVIRONMENT
+# =============================================================================
+python-dotenv>=1.0.0           # Environment variable management
+pydantic>=2.5.0                # Data validation and settings
+pydantic-settings>=2.1.0       # Pydantic settings management
+pyyaml>=6.0.1                  # YAML configuration file support
 
-# Monitoring & Logging
-structlog>=23.2.0
-python-telegram-bot>=20.7
+# =============================================================================
+# DATABASE & STORAGE
+# =============================================================================
+SQLAlchemy>=2.0.0              # ORM for database operations
+aiosqlite>=0.19.0              # Async SQLite support
+asyncpg>=0.29.0                # Async PostgreSQL driver (production)
+influxdb-client>=1.38.0        # InfluxDB for time-series data
+redis>=5.0.0                   # Redis for caching and state management
 
-# Technical Analysis
-ta-lib>=0.4.28
-pandas-ta>=0.3.14
+# =============================================================================
+# MONITORING & LOGGING
+# =============================================================================
+structlog>=23.2.0              # Structured logging
+python-telegram-bot>=20.7      # Telegram notifications
+prometheus-client>=0.19.0      # Metrics for monitoring
+sentry-sdk>=1.38.0             # Error tracking and monitoring
 
-# Testing
-pytest>=7.4.0
-pytest-asyncio>=0.21.0
-pytest-mock>=3.12.0
+# =============================================================================
+# TECHNICAL ANALYSIS
+# =============================================================================
+ta-lib>=0.4.28                 # Technical analysis library
+pandas-ta>=0.3.14              # Pandas technical analysis indicators
 
-# Development
-black>=23.0.0
-isort>=5.13.0
-flake8>=7.0.0
-mypy>=1.7.0
+# =============================================================================
+# SCHEDULING & UTILITIES
+# =============================================================================
+apscheduler>=3.10.0            # Job scheduling (rebalancing, reports)
+pyjwt>=2.8.0                   # JWT authentication
+python-dateutil>=2.8.0         # Date/time utilities
+cryptography>=41.0.0           # Encryption for sensitive data
+
+# =============================================================================
+# TESTING
+# =============================================================================
+pytest>=7.4.0                  # Testing framework
+pytest-asyncio>=0.21.0         # Async test support
+pytest-mock>=3.12.0            # Mocking for tests
+pytest-cov>=4.1.0              # Coverage reporting
+pytest-xdist>=3.5.0            # Parallel test execution
+httpx>=0.25.0                  # HTTP client for testing
+respx>=0.20.0                  # Mock HTTPX for API testing
+
+# =============================================================================
+# DEVELOPMENT TOOLS
+# =============================================================================
+black>=23.0.0                  # Code formatting
+isort>=5.13.0                  # Import sorting
+flake8>=7.0.0                  # Linting
+mypy>=1.7.0                    # Type checking
+bandit>=1.7.6                  # Security scanning
+pre-commit>=3.6.0              # Git hooks
+
+# =============================================================================
+# DOCUMENTATION
+# =============================================================================
+mkdocs>=1.5.0                  # Documentation generator
+mkdocs-material>=9.5.0         # Material theme for MkDocs
