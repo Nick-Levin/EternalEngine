@@ -47,8 +47,12 @@ class TestSubAccountConfig:
     
     def test_subaccount_config_from_env_master(self, monkeypatch):
         """Test SubAccountConfig.from_env for MASTER subaccount."""
-        monkeypatch.setenv("BYBIT_MASTER_API_KEY", "master_key")
-        monkeypatch.setenv("BYBIT_MASTER_API_SECRET", "master_secret")
+        # Mock engine_config.bybit to return test credentials
+        from src.core import config as config_module
+        mock_bybit_config = MagicMock()
+        mock_bybit_config.active_api_key = "master_key"
+        mock_bybit_config.active_api_secret = "master_secret"
+        monkeypatch.setattr(config_module, "engine_config", MagicMock(bybit=mock_bybit_config))
         
         config = SubAccountConfig.from_env(SubAccountType.MASTER)
         
@@ -60,43 +64,58 @@ class TestSubAccountConfig:
     
     def test_subaccount_config_from_env_core_hodl(self, monkeypatch):
         """Test SubAccountConfig.from_env for CORE_HODL subaccount."""
-        monkeypatch.setenv("BYBIT_CORE_HODL_API_KEY", "core_key")
-        monkeypatch.setenv("BYBIT_CORE_HODL_API_SECRET", "core_secret")
+        from src.core import config as config_module
+        mock_bybit_config = MagicMock()
+        mock_bybit_config.active_api_key = "core_key"
+        mock_bybit_config.active_api_secret = "core_secret"
+        monkeypatch.setattr(config_module, "engine_config", MagicMock(bybit=mock_bybit_config))
         
         config = SubAccountConfig.from_env(SubAccountType.CORE_HODL)
         
         assert config.name == "CORE_HODL"
+        assert config.api_key == "core_key"
         assert config.default_market == "spot"
         assert config.max_leverage == 1.0
         assert config.is_read_only is False
     
     def test_subaccount_config_from_env_trend(self, monkeypatch):
         """Test SubAccountConfig.from_env for TREND subaccount."""
-        monkeypatch.setenv("BYBIT_TREND_1_API_KEY", "trend_key")
-        monkeypatch.setenv("BYBIT_TREND_1_API_SECRET", "trend_secret")
+        from src.core import config as config_module
+        mock_bybit_config = MagicMock()
+        mock_bybit_config.active_api_key = "trend_key"
+        mock_bybit_config.active_api_secret = "trend_secret"
+        monkeypatch.setattr(config_module, "engine_config", MagicMock(bybit=mock_bybit_config))
         
         config = SubAccountConfig.from_env(SubAccountType.TREND)
         
         assert config.name == "TREND"
+        assert config.api_key == "trend_key"
         assert config.default_market == "linear"
         assert config.max_leverage == 2.0
         assert config.is_read_only is False
     
     def test_subaccount_config_from_env_funding(self, monkeypatch):
         """Test SubAccountConfig.from_env for FUNDING subaccount."""
-        monkeypatch.setenv("BYBIT_FUNDING_API_KEY", "funding_key")
-        monkeypatch.setenv("BYBIT_FUNDING_API_SECRET", "funding_secret")
+        from src.core import config as config_module
+        mock_bybit_config = MagicMock()
+        mock_bybit_config.active_api_key = "funding_key"
+        mock_bybit_config.active_api_secret = "funding_secret"
+        monkeypatch.setattr(config_module, "engine_config", MagicMock(bybit=mock_bybit_config))
         
         config = SubAccountConfig.from_env(SubAccountType.FUNDING)
         
         assert config.name == "FUNDING"
+        assert config.api_key == "funding_key"
         assert config.default_market == "linear"
         assert config.max_leverage == 2.0
     
     def test_subaccount_config_from_env_tactical(self, monkeypatch):
         """Test SubAccountConfig.from_env for TACTICAL subaccount."""
-        monkeypatch.setenv("BYBIT_TACTICAL_API_KEY", "tactical_key")
-        monkeypatch.setenv("BYBIT_TACTICAL_API_SECRET", "tactical_secret")
+        from src.core import config as config_module
+        mock_bybit_config = MagicMock()
+        mock_bybit_config.active_api_key = "tactical_key"
+        mock_bybit_config.active_api_secret = "tactical_secret"
+        monkeypatch.setattr(config_module, "engine_config", MagicMock(bybit=mock_bybit_config))
         
         config = SubAccountConfig.from_env(SubAccountType.TACTICAL)
         
@@ -181,23 +200,28 @@ class TestByBitClient:
                 await client.close()
     
     @pytest.mark.asyncio
-    async def test_initialize_skips_missing_credentials(self, client):
+    async def test_initialize_skips_missing_credentials(self, client, monkeypatch):
         """Test that initialization skips subaccounts with missing credentials."""
         with patch('ccxt.async_support.bybit') as mock_ccxt:
             mock_exchange = AsyncMock()
             mock_ccxt.return_value = mock_exchange
             
-            # No environment variables set
-            with patch.dict('os.environ', {}, clear=True):
-                await client.initialize([SubAccountType.MASTER], testnet=True)
-                
-                # Should skip initialization due to missing credentials
-                assert "MASTER" not in client.exchanges
-                
-                await client.close()
+            # Mock engine_config.bybit with empty credentials
+            from src.core import config as config_module
+            mock_bybit_config = MagicMock()
+            mock_bybit_config.active_api_key = ""
+            mock_bybit_config.active_api_secret = ""
+            monkeypatch.setattr(config_module, "engine_config", MagicMock(bybit=mock_bybit_config))
+            
+            await client.initialize([SubAccountType.MASTER], testnet=True)
+            
+            # Should skip initialization due to missing credentials
+            assert "MASTER" not in client.exchanges
+            
+            await client.close()
     
     @pytest.mark.asyncio
-    async def test_close_client(self, client):
+    async def test_close_client(self, client, monkeypatch):
         """Test closing the client."""
         with patch('ccxt.async_support.bybit') as mock_ccxt:
             mock_exchange = AsyncMock()
@@ -205,16 +229,19 @@ class TestByBitClient:
             mock_exchange.close = AsyncMock()
             mock_ccxt.return_value = mock_exchange
             
-            with patch.dict('os.environ', {
-                'BYBIT_MASTER_API_KEY': 'test_key',
-                'BYBIT_MASTER_API_SECRET': 'test_secret'
-            }):
-                await client.initialize([SubAccountType.MASTER], testnet=True)
-                await client.close()
-                
-                assert client.exchanges == {}
-                assert client.configs == {}
-                assert client._initialized is False
+            # Mock engine_config.bybit with test credentials
+            from src.core import config as config_module
+            mock_bybit_config = MagicMock()
+            mock_bybit_config.active_api_key = "test_key"
+            mock_bybit_config.active_api_secret = "test_secret"
+            monkeypatch.setattr(config_module, "engine_config", MagicMock(bybit=mock_bybit_config))
+            
+            await client.initialize([SubAccountType.MASTER], testnet=True)
+            await client.close()
+            
+            assert client.exchanges == {}
+            assert client.configs == {}
+            assert client._initialized is False
     
     @pytest.mark.asyncio
     async def test_get_exchange_raises_for_uninitialized(self, client):

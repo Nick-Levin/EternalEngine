@@ -10,7 +10,7 @@ from decimal import Decimal
 import structlog
 
 from src.core.models import MarketData, TradingSignal, SignalType, Position
-from src.core.config import strategy_config
+from src.core.config import engine_config
 from src.strategies.base import BaseStrategy
 
 logger = structlog.get_logger(__name__)
@@ -30,17 +30,17 @@ class DCAStrategy(BaseStrategy):
     Best For: Long-term crypto accumulation
     """
     
-    def __init__(self, symbols: List[str], **kwargs):
-        super().__init__("DCA", symbols, **kwargs)
+    def __init__(self, symbols: List[str], name: str = "DCA", **kwargs):
+        super().__init__(name, symbols, **kwargs)
         
         # DCA configuration
         self.interval_hours = kwargs.get(
             'interval_hours', 
-            strategy_config.dca_interval_hours
+            engine_config.core_hodl.dca_interval_hours
         )
         self.amount_usdt = kwargs.get(
             'amount_usdt', 
-            strategy_config.dca_amount_usdt
+            engine_config.core_hodl.dca_amount_usdt
         )
         
         # Track last purchase time per symbol

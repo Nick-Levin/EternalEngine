@@ -9,6 +9,7 @@ subaccounts, one for each engine:
 - TACTICAL: 5% allocation, spot only
 """
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
 from typing import Dict, List, Optional, Callable, Any, Union
 from datetime import datetime
@@ -22,7 +23,7 @@ from src.core.models import (
     Order, OrderSide, OrderType, OrderStatus, 
     MarketData, Position, PositionSide, Portfolio
 )
-from src.core.config import trading_config
+from src.core.config import trading_config, engine_config
 
 logger = structlog.get_logger(__name__)
 
@@ -59,12 +60,12 @@ class SubAccountConfig:
     
     @classmethod
     def from_env(cls, subaccount_type: SubAccountType) -> "SubAccountConfig":
-        """Create subaccount config from environment variables."""
-        import os
+        """Create subaccount config from engine configuration."""
+        from src.core.config import engine_config
         
-        prefix = subaccount_type.value
-        api_key = os.getenv(f"BYBIT_{prefix}_API_KEY", "")
-        api_secret = os.getenv(f"BYBIT_{prefix}_API_SECRET", "")
+        # Get API credentials from engine_config (reads from .env file)
+        api_key = engine_config.bybit.active_api_key
+        api_secret = engine_config.bybit.active_api_secret
         
         # Determine market type and leverage based on subaccount purpose
         if subaccount_type == SubAccountType.MASTER:
@@ -108,6 +109,75 @@ class RetryConfig:
     DEFAULT_BASE_DELAY = 1.0  # seconds
     DEFAULT_MAX_DELAY = 30.0  # seconds
     DEFAULT_EXPONENTIAL_BASE = 2.0
+
+
+class PybitDemoClient:
+    """
+    Async wrapper for pybit HTTP client (Demo Trading mode).
+    
+    Bybit Demo Trading requires pybit with demo=True parameter.
+    This wrapper runs sync pybit calls in thread pool executor.
+    """
+    
+    def __init__(self, api_key: str, api_secret: str):
+        from pybit.unified_trading import HTTP
+        
+        self._client = HTTP(
+            testnet=False,
+            demo=True,
+            api_key=api_key,
+            api_secret=api_secret,
+        )
+        self._executor = ThreadPoolExecutor(max_workers=4)
+        self.apiKey = api_key  # For compatibility
+        self.secret = api_secret
+        
+    async def fetch_balance(self, params=None):
+        """Fetch wallet balance (async wrapper)."""
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            self._executor,
+            lambda: self._client.get_wallet_balance(accountType='UNIFIED')
+        )
+        return self._convert_balance(result)
+    
+    def _convert_balance(self, result):
+        """Convert pybit response to ccxt-like format."""
+        balances = {'info': result, 'free': {}, 'used': {}, 'total': {}}
+        
+        if result.get('retCode') == 0:
+            for account in result.get('result', {}).get('list', []):
+                for coin_data in account.get('coin', []):
+                    coin = coin_data.get('coin', '')
+                    if not coin:
+                        continue
+                    
+                    # Handle empty strings and None values
+                    wallet_str = coin_data.get('walletBalance', '0') or '0'
+                    free_str = coin_data.get('availableToWithdraw', '') or wallet_str
+                    
+                    try:
+                        wallet = float(wallet_str)
+                        free = float(free_str) if free_str else wallet
+                    except (ValueError, TypeError):
+                        wallet = 0.0
+                        free = 0.0
+                    
+                    # Only include coins with non-zero balance
+                    if wallet > 0 or free > 0:
+                        balances['total'][coin] = wallet
+                        balances['free'][coin] = free
+                        balances['used'][coin] = max(0, wallet - free)
+                    
+        return balances
+    
+    async def load_markets(self):
+        """Load markets (no-op for pybit, returns empty dict for compatibility)."""
+        return {}
+    
+    async def close(self):
+        """Close the client."""
+        self._executor.shutdown(wait=False)
 
 
 def with_retry(
@@ -250,6 +320,49 @@ class ByBitClient:
             )
             return
         
+        # Determine if using demo trading (fake money on Bybit Demo Trading)
+        is_demo_trading = engine_config.bybit.api_mode == "demo" and not testnet
+        
+        if is_demo_trading:
+            # Use pybit for demo trading (required by Bybit)
+            await self._initialize_demo_subaccount(subaccount_type, config)
+        else:
+            # Use ccxt for testnet and production
+            await self._initialize_ccxt_subaccount(subaccount_type, config, testnet)
+    
+    async def _initialize_demo_subaccount(self, subaccount_type: SubAccountType, config: SubAccountConfig):
+        """Initialize subaccount using pybit for Demo Trading."""
+        try:
+            exchange = PybitDemoClient(
+                api_key=config.api_key,
+                api_secret=config.api_secret
+            )
+            
+            # Test connection by fetching balance
+            await exchange.fetch_balance()
+            
+            self.exchanges[subaccount_type.value] = exchange
+            self.configs[subaccount_type.value] = config
+            self._markets_loaded[subaccount_type.value] = True
+            
+            logger.info(
+                "bybit_client.subaccount_initialized",
+                subaccount=subaccount_type.value,
+                default_market=config.default_market,
+                max_leverage=config.max_leverage,
+                mode="demo_trading"
+            )
+        except Exception as e:
+            logger.error(
+                "bybit_client.subaccount_init_failed",
+                subaccount=subaccount_type.value,
+                error=str(e),
+                mode="demo_trading"
+            )
+            raise
+    
+    async def _initialize_ccxt_subaccount(self, subaccount_type: SubAccountType, config: SubAccountConfig, testnet: bool):
+        """Initialize subaccount using ccxt for Testnet/Production."""
         ccxt_config = {
             'apiKey': config.api_key,
             'secret': config.api_secret,
@@ -258,6 +371,7 @@ class ByBitClient:
             'options': {
                 'defaultType': config.default_market,
                 'adjustForTimeDifference': True,
+                'recvWindow': 20000,
             }
         }
         
@@ -278,13 +392,21 @@ class ByBitClient:
                 "bybit_client.subaccount_initialized",
                 subaccount=subaccount_type.value,
                 default_market=config.default_market,
-                max_leverage=config.max_leverage
+                max_leverage=config.max_leverage,
+                mode="ccxt"
             )
         except Exception as e:
+            # Close the exchange to prevent resource leaks
+            try:
+                await exchange.close()
+            except Exception:
+                pass
+            
             logger.error(
                 "bybit_client.subaccount_init_failed",
                 subaccount=subaccount_type.value,
-                error=str(e)
+                error=str(e),
+                mode="ccxt"
             )
             raise
     
@@ -330,7 +452,7 @@ class ByBitClient:
     @with_retry()
     async def get_balance(
         self, 
-        subaccount: str,
+        subaccount: str = "MASTER",
         asset: str = "USDT"
     ) -> Portfolio:
         """Get wallet balance for a subaccount.

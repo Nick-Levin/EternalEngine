@@ -1002,11 +1002,27 @@ class TradingEngine:
     
     async def _save_state(self):
         """Save state to database."""
+        import json
+        from decimal import Decimal
+        from datetime import datetime
+        
+        def custom_encoder(obj):
+            """JSON encoder that handles Decimal and datetime types."""
+            if isinstance(obj, Decimal):
+                return float(obj)
+            if isinstance(obj, datetime):
+                return obj.isoformat()
+            raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
+        
         try:
             # Save engine states (optional)
             if hasattr(self.database, 'save_engine_state'):
                 for engine_type, state in self.engine_states.items():
-                    await self.database.save_engine_state(engine_type, state)
+                    await self.database.save_engine_state(
+                        engine_name=engine_type.value,
+                        state=json.dumps(state.model_dump(), default=custom_encoder),
+                        allocation_pct=float(state.current_allocation_pct)
+                    )
             
             logger.info("trading_engine.state_saved")
         except Exception as e:

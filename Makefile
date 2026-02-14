@@ -71,7 +71,7 @@ setup: ## Set up development environment (create venv, install deps, copy .env)
 
 init-db: ## Initialize database schema
 	@echo "$(BLUE)Initializing database...$(NC)"
-	$(PYTHON_VENV) -c "from src.storage.database import init_db; init_db()"
+	$(PYTHON_VENV) main.py --init-db
 	@echo "$(GREEN)✓ Database initialized$(NC)"
 
 install-hooks: ## Install git pre-commit hooks

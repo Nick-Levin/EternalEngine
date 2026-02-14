@@ -39,38 +39,43 @@ class SystemConfig(BaseSettings):
 class BybitAPIConfig(BaseSettings):
     """Bybit API configuration supporting both DEMO and PROD modes."""
     
-    model_config = SettingsConfigDict(env_file=".env", case_sensitive=False, extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env", 
+        case_sensitive=False, 
+        extra="ignore",
+        populate_by_name=True
+    )
     
     # API Mode: "demo" for testnet, "prod" for live
-    api_mode: Literal["demo", "prod"] = Field(default="demo", env="BYBIT_API_MODE")
+    api_mode: Literal["demo", "prod"] = Field(default="demo", validation_alias="BYBIT_API_MODE")
     
     # API version and settings
-    api_version: str = Field(default="v5", env="BYBIT_API_VERSION")
-    testnet: bool = Field(default=True, env="BYBIT_TESTNET")
-    timeout: int = Field(default=30, env="BYBIT_TIMEOUT")
-    retry_attempts: int = Field(default=3, env="BYBIT_RETRY_ATTEMPTS")
-    rate_limit_rest: int = Field(default=120, env="BYBIT_RATE_LIMIT_REST")
-    rate_limit_websocket: int = Field(default=1000, env="BYBIT_RATE_LIMIT_WEBSOCKET")
+    api_version: str = Field(default="v5", validation_alias="BYBIT_API_VERSION")
+    testnet: bool = Field(default=True, validation_alias="BYBIT_TESTNET")
+    timeout: int = Field(default=30, validation_alias="BYBIT_TIMEOUT")
+    retry_attempts: int = Field(default=3, validation_alias="BYBIT_RETRY_ATTEMPTS")
+    rate_limit_rest: int = Field(default=120, validation_alias="BYBIT_RATE_LIMIT_REST")
+    rate_limit_websocket: int = Field(default=1000, validation_alias="BYBIT_RATE_LIMIT_WEBSOCKET")
     
     # DEMO API Keys (Testnet - Read/Write)
-    demo_api_key: str = Field(default="", env="BYBIT_DEMO_API_KEY")
-    demo_api_secret: str = Field(default="", env="BYBIT_DEMO_API_SECRET")
+    demo_api_key: str = Field(default="", validation_alias="BYBIT_DEMO_API_KEY")
+    demo_api_secret: str = Field(default="", validation_alias="BYBIT_DEMO_API_SECRET")
     
     # PROD API Keys (Live - Read Only for now)
-    prod_api_key: str = Field(default="", env="BYBIT_PROD_API_KEY")
-    prod_api_secret: str = Field(default="", env="BYBIT_PROD_API_SECRET")
+    prod_api_key: str = Field(default="", validation_alias="BYBIT_PROD_API_KEY")
+    prod_api_secret: str = Field(default="", validation_alias="BYBIT_PROD_API_SECRET")
     
     # Legacy subaccount API keys (for backward compatibility)
-    master_api_key: str = Field(default="", env="BYBIT_MASTER_API_KEY")
-    master_api_secret: str = Field(default="", env="BYBIT_MASTER_API_SECRET")
-    core_hodl_api_key: str = Field(default="", env="BYBIT_CORE_HODL_API_KEY")
-    core_hodl_api_secret: str = Field(default="", env="BYBIT_CORE_HODL_API_SECRET")
-    trend_1_api_key: str = Field(default="", env="BYBIT_TREND_1_API_KEY")
-    trend_1_api_secret: str = Field(default="", env="BYBIT_TREND_1_API_SECRET")
-    funding_api_key: str = Field(default="", env="BYBIT_FUNDING_API_KEY")
-    funding_api_secret: str = Field(default="", env="BYBIT_FUNDING_API_SECRET")
-    tactical_api_key: str = Field(default="", env="BYBIT_TACTICAL_API_KEY")
-    tactical_api_secret: str = Field(default="", env="BYBIT_TACTICAL_API_SECRET")
+    master_api_key: str = Field(default="", validation_alias="BYBIT_MASTER_API_KEY")
+    master_api_secret: str = Field(default="", validation_alias="BYBIT_MASTER_API_SECRET")
+    core_hodl_api_key: str = Field(default="", validation_alias="BYBIT_CORE_HODL_API_KEY")
+    core_hodl_api_secret: str = Field(default="", validation_alias="BYBIT_CORE_HODL_API_SECRET")
+    trend_1_api_key: str = Field(default="", validation_alias="BYBIT_TREND_1_API_KEY")
+    trend_1_api_secret: str = Field(default="", validation_alias="BYBIT_TREND_1_API_SECRET")
+    funding_api_key: str = Field(default="", validation_alias="BYBIT_FUNDING_API_KEY")
+    funding_api_secret: str = Field(default="", validation_alias="BYBIT_FUNDING_API_SECRET")
+    tactical_api_key: str = Field(default="", validation_alias="BYBIT_TACTICAL_API_KEY")
+    tactical_api_secret: str = Field(default="", validation_alias="BYBIT_TACTICAL_API_SECRET")
     
     @computed_field
     @property
@@ -529,6 +534,12 @@ class LoggingConfig(BaseSettings):
     """Logging configuration."""
     
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False, extra="ignore")
+    
+    # Log level
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(
+        default="INFO", 
+        env="LOG_LEVEL"
+    )
     
     # Log settings
     log_file: str = Field(default="logs/eternal_engine.log", env="LOG_FILE")

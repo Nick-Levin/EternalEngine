@@ -10,7 +10,7 @@ from decimal import Decimal
 import structlog
 
 from src.core.models import MarketData, TradingSignal, SignalType, Position
-from src.core.config import strategy_config
+from src.core.config import engine_config
 from src.strategies.base import BaseStrategy
 
 logger = structlog.get_logger(__name__)
@@ -35,14 +35,14 @@ class GridStrategy(BaseStrategy):
     - Position size limits per grid
     """
     
-    def __init__(self, symbols: List[str], **kwargs):
-        super().__init__("Grid", symbols, **kwargs)
+    def __init__(self, symbols: List[str], name: str = "Grid", **kwargs):
+        super().__init__(name, symbols, **kwargs)
         
         # Grid configuration
-        self.grid_levels = kwargs.get('grid_levels', strategy_config.grid_levels)
+        self.grid_levels = kwargs.get('grid_levels', engine_config.tactical.grid_levels)
         self.grid_spacing_pct = kwargs.get(
             'grid_spacing_pct', 
-            strategy_config.grid_spacing_pct
+            engine_config.tactical.grid_spacing_pct
         )
         self.investment_per_grid_pct = kwargs.get('investment_per_grid_pct', 2.0)
         

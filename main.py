@@ -110,7 +110,7 @@ class TradingBot:
         
         # Initialize exchange client
         self.exchange = ByBitClient()
-        await self.exchange.initialize()
+        await self.exchange.initialize(testnet=engine_config.bybit.testnet)
         logger.info("bot.exchange_initialized", api_mode=engine_config.bybit.api_mode)
         
         # Initialize risk manager
@@ -130,11 +130,12 @@ class TradingBot:
             )
         
         # Create trading engine (orchestrator)
+        # Note: strategies are managed separately, pass empty dict to engine
         self.engine = TradingEngine(
             exchange=self.exchange,
             risk_manager=self.risk_manager,
             database=self.database,
-            strategies=strategies
+            strategies={}
         )
         
         self._initialized = True
