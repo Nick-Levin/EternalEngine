@@ -8,6 +8,18 @@
 
 ---
 
+## 📚 Documentation Quick Links
+
+| Document | Purpose | When to Read |
+|----------|---------|--------------|
+| **[AGENTS.md](AGENTS.md)** (this file) | Coding standards, danger zones, principles | **Before every coding session** |
+| **[ARCHITECTURE.md](ARCHITECTURE.md)** | System design, component interactions | When adding new features |
+| **[DEVLOG.md](DEVLOG.md)** | Development diary, session history | For context on why things were built this way |
+| **[docs/decisions/](docs/decisions/)** | Architecture Decision Records (ADRs) | For major design choices |
+| **[docs/lessons-learned.md](docs/lessons-learned.md)** | Problems encountered and solutions | When debugging similar issues |
+
+---
+
 ## 1. Project Identity
 
 ### The Eternal Engine
@@ -674,6 +686,7 @@ To change leverage limits:
 
 For deep dives into specific topics, refer to these docs:
 
+### Core Documentation
 | Topic | Document | Lines |
 |-------|----------|-------|
 | System Architecture | `docs/03-system-architecture/01-technical-overview.md` | 898 |
@@ -682,6 +695,20 @@ For deep dives into specific topics, refer to these docs:
 | Bybit Integration | `docs/06-infrastructure/01-bybit-integration.md` | - |
 | Configuration Examples | `docs/10-appendices/03-configuration-examples.md` | - |
 | Glossary | `docs/10-appendices/01-glossary.md` | - |
+
+### Development Documentation
+| Document | Purpose |
+|----------|---------|
+| **[DEVLOG.md](DEVLOG.md)** | Chronological diary of all development sessions |
+| **[docs/decisions/](docs/decisions/)** | Architecture Decision Records (ADRs) |
+| **[docs/lessons-learned.md](docs/lessons-learned.md)** | Problems encountered and solutions |
+
+### When to Read Each Document
+- **Starting new work:** Read AGENTS.md (this file)
+- **Debugging issues:** Check lessons-learned.md
+- **Understanding why something was built:** Read DEVLOG.md
+- **Major design decisions:** Check docs/decisions/
+- **System overview:** Read ARCHITECTURE.md
 
 ### Quick Reference Commands
 

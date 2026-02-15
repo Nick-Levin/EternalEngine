@@ -7,6 +7,21 @@
 
 ---
 
+## 📚 Related Documentation
+
+This document describes the system architecture. For other aspects of the project:
+
+| Document | Focus Area |
+|----------|------------|
+| **[AGENTS.md](AGENTS.md)** | Coding standards, agent guidelines, danger zones |
+| **[DEVLOG.md](DEVLOG.md)** | Development diary with session-by-session history |
+| **[docs/decisions/](docs/decisions/)** | Architecture Decision Records (ADRs) |
+| **[docs/lessons-learned.md](docs/lessons-learned.md)** | Problems encountered and solutions |
+
+**Tip:** If you're wondering *why* something was built a certain way, check the [DEVLOG.md](DEVLOG.md) for the development history and [docs/decisions/](docs/decisions/) for formal ADRs.
+
+---
+
 # Table of Contents
 
 1. [System Overview](#1-system-overview)
@@ -1254,6 +1269,33 @@ BybitTrader/
 
 ---
 
+# Appendix C: Development Documentation
+
+## Architecture Decision Records
+
+Major architectural decisions are documented as ADRs in `docs/decisions/`:
+
+| ADR | Title | Status |
+|-----|-------|--------|
+| [001](docs/decisions/001-pybit-over-ccxt.md) | Using Pybit Over CCXT | ✅ Accepted |
+| [002](docs/decisions/002-three-phase-core-hodl.md) | 3-Phase CORE-HODL Strategy | ✅ Accepted |
+| [003](docs/decisions/003-position-sync-strategy.md) | Position Synchronization | ✅ Accepted |
+| [004](docs/decisions/004-top10-coin-selection.md) | TOP 10 Coin Selection | ✅ Accepted |
+
+## Development History
+
+For a chronological diary of development sessions, see [DEVLOG.md](DEVLOG.md). This includes:
+- Session-by-session progress
+- Bugs discovered and fixed
+- Design decisions made during development
+- Testing results
+
+## Lessons Learned
+
+For common problems and their solutions, see [docs/lessons-learned.md](docs/lessons-learned.md).
+
+---
+
 **Document End**
 
-*For questions or clarifications, refer to the complete documentation in the `docs/` folder.*
+*For questions or clarifications, refer to the complete documentation in the `docs/` folder or the [DEVLOG.md](DEVLOG.md) for development history.*
