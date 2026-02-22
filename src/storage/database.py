@@ -106,6 +106,23 @@ class EngineStateModel(Base):
     last_updated: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
 
+class DCAStateModel(Base):
+    """SQLAlchemy model for DCA strategy state persistence.
+    
+    Stores last purchase timestamps to survive bot restarts.
+    """
+    __tablename__ = 'dca_state'
+    
+    strategy_name: Mapped[str] = mapped_column(String, primary_key=True)
+    symbol: Mapped[str] = mapped_column(String, primary_key=True)
+    last_purchase: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, 
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc)
+    )
+
+
 class CircuitBreakerEventModel(Base):
     """SQLAlchemy model for circuit breaker triggers."""
     __tablename__ = 'circuit_breaker_events'
@@ -603,6 +620,97 @@ class Database:
                 }
                 for s in db_states
             ]
+    
+    # DCA state operations
+    async def save_dca_state(
+        self,
+        strategy_name: str,
+        symbol: str,
+        last_purchase: datetime
+    ):
+        """
+        Save DCA last purchase timestamp for a symbol.
+        
+        Args:
+            strategy_name: The DCA strategy name
+            symbol: Trading pair symbol
+            last_purchase: Last purchase datetime (UTC)
+        """
+        async with self.session_maker() as session:
+            # Try to get existing record
+            query = select(DCAStateModel).where(
+                and_(
+                    DCAStateModel.strategy_name == strategy_name,
+                    DCAStateModel.symbol == symbol
+                )
+            )
+            result = await session.execute(query)
+            db_state = result.scalar_one_or_none()
+            
+            if db_state is None:
+                db_state = DCAStateModel(
+                    strategy_name=strategy_name,
+                    symbol=symbol,
+                    last_purchase=last_purchase
+                )
+                session.add(db_state)
+            else:
+                db_state.last_purchase = last_purchase
+                db_state.updated_at = datetime.now(timezone.utc)
+            
+            await session.commit()
+    
+    async def get_dca_state(
+        self,
+        strategy_name: str,
+        symbol: str
+    ) -> Optional[datetime]:
+        """
+        Get last purchase timestamp for a DCA symbol.
+        
+        Args:
+            strategy_name: The DCA strategy name
+            symbol: Trading pair symbol
+            
+        Returns:
+            Last purchase datetime (UTC) or None
+        """
+        async with self.session_maker() as session:
+            query = select(DCAStateModel).where(
+                and_(
+                    DCAStateModel.strategy_name == strategy_name,
+                    DCAStateModel.symbol == symbol
+                )
+            )
+            result = await session.execute(query)
+            db_state = result.scalar_one_or_none()
+            
+            if db_state is None:
+                return None
+            
+            return db_state.last_purchase
+    
+    async def get_all_dca_states(
+        self,
+        strategy_name: str
+    ) -> Dict[str, datetime]:
+        """
+        Get all last purchase timestamps for a DCA strategy.
+        
+        Args:
+            strategy_name: The DCA strategy name
+            
+        Returns:
+            Dictionary of symbol -> last_purchase datetime
+        """
+        async with self.session_maker() as session:
+            query = select(DCAStateModel).where(
+                DCAStateModel.strategy_name == strategy_name
+            )
+            result = await session.execute(query)
+            db_states = result.scalars().all()
+            
+            return {s.symbol: s.last_purchase for s in db_states}
     
     # Circuit breaker operations
     async def record_circuit_breaker(

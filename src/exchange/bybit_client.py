@@ -127,6 +127,7 @@ class PybitDemoClient:
             demo=True,
             api_key=api_key,
             api_secret=api_secret,
+            recv_window=10000,  # 10 seconds to handle clock skew
         )
         self._executor = ThreadPoolExecutor(max_workers=4)
         self.apiKey = api_key  # For compatibility

@@ -16,7 +16,7 @@ Architecture:
 """
 import asyncio
 from typing import Dict, List, Optional, Type
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 import structlog
 
@@ -134,7 +134,7 @@ class TradingEngine:
                 is_active=self._is_engine_enabled(engine_type),
                 config=self._get_engine_config(engine_type)
             )
-            self._last_analysis[engine_type] = datetime.min
+            self._last_analysis[engine_type] = datetime.min.replace(tzinfo=timezone.utc)
     
     def _is_engine_enabled(self, engine_type: EngineType) -> bool:
         """Check if an engine is enabled in configuration."""
@@ -182,6 +182,9 @@ class TradingEngine:
         # Load state from database
         await self._load_state()
         
+        # Initialize DCA persistence for all strategies
+        await self._initialize_dca_persistence()
+        
         # Sync positions from exchange (catches positions not in database)
         await self._sync_positions_from_exchange()
         
@@ -191,6 +194,39 @@ class TradingEngine:
             engines=list(self.engine_states.keys()),
             enabled_engines=[e.value for e, s in self.engine_states.items() if s.is_active]
         )
+    
+    async def _initialize_dca_persistence(self):
+        """
+        Initialize DCA persistence for all DCA strategies.
+        
+        Sets up database callbacks and loads last_purchase times from database.
+        This ensures DCA timing survives bot restarts.
+        """
+        for engine_type, strategies in self.engines.items():
+            for strategy in strategies:
+                # Check if this is a DCA strategy with persistence support
+                if hasattr(strategy, 'last_purchase') and hasattr(strategy, 'set_db_save_callback'):
+                    try:
+                        # Set callback for saving to database
+                        strategy.set_db_save_callback(self.database.save_dca_state)
+                        
+                        # Load existing last_purchase times from database
+                        loaded_times = await self.database.get_all_dca_states(strategy.name)
+                        if loaded_times:
+                            for symbol, timestamp in loaded_times.items():
+                                strategy.last_purchase[symbol] = timestamp
+                            logger.info(
+                                "trading_engine.dca_state_loaded",
+                                strategy=strategy.name,
+                                symbols=list(loaded_times.keys()),
+                                count=len(loaded_times)
+                            )
+                    except Exception as e:
+                        logger.warning(
+                            "trading_engine.dca_persistence_init_failed",
+                            strategy=strategy.name,
+                            error=str(e)
+                        )
     
     async def start(self):
         """
@@ -256,7 +292,7 @@ class TradingEngine:
         """
         while self._running:
             try:
-                now = datetime.utcnow()
+                now = datetime.now(timezone.utc)
                 
                 # Check for emergency stop
                 if self._emergency_stop:
@@ -286,7 +322,7 @@ class TradingEngine:
                         continue
                     
                     # Check analysis interval
-                    last_analysis = self._last_analysis.get(engine_type, datetime.min)
+                    last_analysis = self._last_analysis.get(engine_type, datetime.min.replace(tzinfo=timezone.utc))
                     if now - last_analysis >= timedelta(seconds=self.analysis_interval):
                         await self._run_analysis_cycle(engine_type)
                         self._last_analysis[engine_type] = now
@@ -564,7 +600,7 @@ class TradingEngine:
         await self.database.save_order(order)
         
         # Update engine state
-        self.engine_states[engine_type].last_signal_time = datetime.utcnow()
+        self.engine_states[engine_type].last_signal_time = datetime.now(timezone.utc)
         
         self._signals_executed += 1
         
@@ -811,7 +847,7 @@ class TradingEngine:
                 
                 if status != order.status:
                     order.status = status
-                    order.updated_at = datetime.utcnow()
+                    order.updated_at = datetime.now(timezone.utc)
                     
                     if status == OrderStatus.FILLED:
                         await self._on_order_filled(order)
@@ -824,7 +860,7 @@ class TradingEngine:
     
     async def _on_order_filled(self, order: Order):
         """Handle filled order."""
-        order.filled_at = datetime.utcnow()
+        order.filled_at = datetime.now(timezone.utc)
         
         # Get engine type from metadata
         engine_type_str = order.metadata.get('engine_type', 'CORE_HODL')
@@ -863,7 +899,7 @@ class TradingEngine:
             del self.pending_orders[order.id]
         
         # Update engine state
-        self.engine_states[engine_type].last_trade_time = datetime.utcnow()
+        self.engine_states[engine_type].last_trade_time = datetime.now(timezone.utc)
         
         logger.info(
             "trading_engine.order_filled",
@@ -1165,7 +1201,7 @@ class TradingEngine:
                         side=PositionSide.LONG,
                         entry_price=current_price,  # Use current price as estimate
                         amount=amount_decimal,
-                        opened_at=datetime.utcnow(),
+                        opened_at=datetime.now(timezone.utc),
                         metadata={'engine_type': 'CORE_HODL', 'synced_from_exchange': True}
                     )
                     
@@ -1220,7 +1256,7 @@ class TradingEngine:
                                 # Only set if not already set (from database)
                                 # Only set if we have a position for this symbol
                                 if symbol in core_hodl_positions:
-                                    strategy.last_purchase[symbol] = datetime.utcnow()
+                                    strategy.last_purchase[symbol] = datetime.now(timezone.utc)
                                     logger.info("trading_engine.last_purchase_synced",
                                               symbol=symbol, 
                                               strategy=strategy.name,
@@ -1414,7 +1450,7 @@ class TradingEngine:
             SystemState model with all current state
         """
         return SystemState(
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             portfolio=self.portfolio or Portfolio(total_balance=Decimal("0"), available_balance=Decimal("0")),
             engines=self.engine_states,
             positions=self.positions,

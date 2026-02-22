@@ -12,6 +12,7 @@
 
 ## Table of Contents
 
+- [2026-02-22 - DCA State Persistence & UTC Timezone Fixes](#2026-02-22---dca-state-persistence--utc-timezone-fixes)
 - [2026-02-14 - Fresh Deployment Test & Bug Fixes](#2026-02-14---fresh-deployment-test--bug-fixes)
 - [2026-02-14 - Initial Live Deployment](#2026-02-14---initial-live-deployment)
 - [2026-02-14 - Position Sync & State Management](#2026-02-14---position-sync--state-management)
@@ -314,8 +315,8 @@ max_daily_loss_pct = Decimal(str(trading_config.max_daily_loss_pct)) * 100
 
 | Metric | Value |
 |--------|-------|
-| Total Development Sessions | 5+ sessions |
-| Critical Bugs Fixed | 6+ |
+| Total Development Sessions | 6+ sessions |
+| Critical Bugs Fixed | 9+ |
 | Tests Passing | 316 |
 | Lines of Code | ~8,000+ (src/) |
 | Documentation | 12,500+ lines (docs/) |
@@ -345,5 +346,95 @@ Week 2 of 12 deployment - approximately 2026-02-21 (7 days from initial deployme
 
 ---
 
-*Last Updated: 2026-02-14*
-*Status: Bot running, waiting for next purchase cycle*
+## 2026-02-22 - DCA State Persistence & UTC Timezone Fixes
+
+### Session Focus
+Fixing DCA timing persistence across bot restarts and resolving timezone warnings.
+
+### What Was Done
+1. **Added DCA state persistence** - last_purchase times now survive bot restarts
+2. **Fixed UTC timezone deprecation warnings** - Replaced all `datetime.utcnow()` with `datetime.now(timezone.utc)`
+3. **Updated risk manager** - Allow adding to existing LONG positions for DCA accumulation
+4. **Created utility scripts** - Added helper scripts for manual DCA operations
+
+### Problems Discovered & Fixed
+
+#### Problem: DCA Timer Reset on Bot Restart
+**Symptom:** Bot restarted on Feb 20 reset all last_purchase timers, causing missed Feb 22 purchases.
+
+**Root Cause:** last_purchase was only stored in memory, lost on restart.
+
+**Solution:** Added database persistence for DCA state:
+```python
+# New database model
+class DCAStateModel(Base):
+    strategy_name: str (primary_key)
+    symbol: str (primary_key)
+    last_purchase: datetime
+    updated_at: datetime
+```
+
+**Implementation:**
+- `save_dca_state()` - Saves timestamp when order fills
+- `get_all_dca_states()` - Loads timestamps on startup
+- `set_db_save_callback()` - Connects strategy to database
+
+**Files:** `src/storage/database.py`, `src/strategies/dca_strategy.py`, `src/core/engine.py`
+
+#### Problem: Risk Manager Blocking DCA Accumulation
+**Symptom:** Risk manager rejected buy signals for symbols with existing LONG positions.
+
+**Root Cause:** `_check_duplicate_position()` blocked all same-side positions.
+
+**Fix:** Changed to allow adding to LONG positions (DCA accumulation), only block duplicate SHORT:
+```python
+if signal.signal_type == SignalType.BUY and existing.side == PositionSide.LONG:
+    # Check position size limit instead of blocking
+    if current_value >= max_position_value:
+        return RiskCheck(passed=False, reason="Position size limit reached")
+    return RiskCheck(passed=True)  # Allow accumulation
+```
+
+**File:** `src/risk/risk_manager.py`
+
+#### Problem: UTC Deprecation Warnings
+**Symptom:** Python 3.12+ deprecation warnings about `datetime.utcnow()`.
+
+**Fix:** Replaced all occurrences with timezone-aware datetime:
+```python
+# Before
+datetime.utcnow()
+
+# After  
+datetime.now(timezone.utc)
+```
+
+**Files:** `src/core/engine.py`, `src/strategies/dca_strategy.py`, `src/risk/risk_manager.py`
+
+### New Utility Scripts
+
+#### `scripts/fix_dca_missed_purchase.py`
+Fixes missed DCA purchases by resetting last_purchase timestamps to the original date.
+
+```bash
+python scripts/fix_dca_missed_purchase.py
+```
+
+#### `scripts/trigger_dca_purchase.py`
+Simulates or triggers manual DCA purchases (dry-run by default).
+
+```bash
+python scripts/trigger_dca_purchase.py --symbols BTCUSDT,ETHUSDT --amount 500
+```
+
+### Current State
+- ✅ DCA state persists across restarts
+- ✅ No more UTC deprecation warnings
+- ✅ Risk manager allows DCA accumulation
+- ✅ Utility scripts for manual operations
+- ⚠️ Missed Feb 22 purchases need to be addressed with fix script
+
+---
+
+*Last Updated: 2026-02-22*
+*Status: Bug fixes complete, ready for next DCA cycle*

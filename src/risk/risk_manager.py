@@ -8,7 +8,7 @@ CRITICAL: Any changes to this file must be reviewed and tested thoroughly.
 Incorrect risk controls can lead to catastrophic losses.
 """
 from decimal import Decimal, ROUND_DOWN
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Callable, Any
 from dataclasses import dataclass, field
 from enum import Enum, auto
@@ -268,7 +268,7 @@ class RiskManager:
     
     async def initialize(self, portfolio: Portfolio):
         """Initialize risk manager with current portfolio state."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         self.daily_starting_balance = portfolio.total_balance
         self.weekly_starting_balance = portfolio.total_balance
         self.all_time_high_balance = portfolio.total_balance
@@ -287,7 +287,7 @@ class RiskManager:
     
     def reset_periods(self, portfolio: Portfolio):
         """Reset daily/weekly tracking periods."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         
         # Reset daily
         if self.last_reset_day and now.date() != self.last_reset_day.date():
@@ -439,7 +439,7 @@ class RiskManager:
                 metadata={'level': cb.level.value, 'triggered_at': cb.triggered_at.isoformat() if cb.triggered_at else None}
             )
         
-        if cb.pause_new_entries and cb.pause_until and datetime.utcnow() < cb.pause_until:
+        if cb.pause_new_entries and cb.pause_until and datetime.now(timezone.utc) < cb.pause_until:
             return RiskCheck(
                 passed=False,
                 reason=f"New entries paused until {cb.pause_until.isoformat()}",
@@ -645,19 +645,32 @@ class RiskManager:
         portfolio: Portfolio,
         current_positions: Dict[str, Position]
     ) -> RiskCheck:
-        """Check if we already have a position in this symbol."""
+        """Check if we already have a position in this symbol.
+        
+        Note: For DCA/accumulation strategies, we allow adding to existing LONG positions.
+        Only blocks duplicate SHORT positions (risk management).
+        """
         if signal.symbol in current_positions:
             existing = current_positions[signal.symbol]
             
-            # Check for same-side position
+            # Allow adding to existing LONG positions (DCA accumulation)
+            # This is essential for CORE-HODL and other accumulation strategies
             if signal.signal_type == SignalType.BUY and existing.side == PositionSide.LONG:
-                return RiskCheck(
-                    passed=False,
-                    reason=f"Already have LONG position in {signal.symbol}",
-                    risk_level="normal",
-                    metadata={'symbol': signal.symbol, 'existing_side': existing.side.value}
-                )
+                # Check position size limit instead of blocking
+                current_value = existing.amount * existing.entry_price
+                max_position_value = portfolio.total_balance * Decimal(str(trading_config.max_position_pct)) / 100
+                
+                if current_value >= max_position_value:
+                    return RiskCheck(
+                        passed=False,
+                        reason=f"Position size limit reached for {signal.symbol}",
+                        risk_level="normal",
+                        metadata={'symbol': signal.symbol, 'current_value': float(current_value), 'max_value': float(max_position_value)}
+                    )
+                # Allow the buy - it's accumulation
+                return RiskCheck(passed=True)
             
+            # Block duplicate SHORT positions
             if signal.signal_type == SignalType.SELL and existing.side == PositionSide.SHORT:
                 return RiskCheck(
                     passed=False,
@@ -721,7 +734,7 @@ class RiskManager:
         portfolio: Portfolio
     ):
         """Activate a circuit breaker level with appropriate actions."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         actions = self.CIRCUIT_BREAKER_ACTIONS.get(level, {})
         
         # Record previous state
@@ -783,7 +796,7 @@ class RiskManager:
         
         # Record reset
         self.circuit_breaker_history.append({
-            'timestamp': datetime.utcnow().isoformat(),
+            'timestamp': datetime.now(timezone.utc).isoformat(),
             'action': 'reset',
             'previous_level': level.value,
             'new_level': 'NONE'
@@ -1017,7 +1030,7 @@ class RiskManager:
         if not self.emergency_stop:
             self.emergency_stop = True
             self.emergency_reason = reason
-            self.emergency_triggered_at = datetime.utcnow()
+            self.emergency_triggered_at = datetime.now(timezone.utc)
             
             logger.critical(
                 "risk_manager.emergency_stop_triggered",
@@ -1207,7 +1220,7 @@ class RiskManager:
     def _log_signal_rejected(self, signal: TradingSignal, rule: str, reason: str):
         """Log a rejected signal for analysis."""
         rejection = {
-            'timestamp': datetime.utcnow().isoformat(),
+            'timestamp': datetime.now(timezone.utc).isoformat(),
             'symbol': signal.symbol,
             'signal_type': signal.signal_type.value,
             'strategy': signal.strategy_name,

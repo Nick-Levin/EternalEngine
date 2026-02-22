@@ -159,7 +159,7 @@ class TradingBot:
             if engine_config.core_hodl.enabled:
                 dca = DCAStrategy(
                     name="CORE-HODL",
-                    symbols=engine_config.trading_mode.default_symbols,
+                    symbols=engine_config.trading_mode.core_hodl_symbols,
                     interval_hours=engine_config.core_hodl.dca_interval_hours,
                     amount_usdt=Decimal(str(engine_config.core_hodl.dca_amount_usdt))
                 )

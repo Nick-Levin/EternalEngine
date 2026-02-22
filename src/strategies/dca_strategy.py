@@ -22,7 +22,7 @@ Assets: BTC, ETH (spot only)
 """
 from enum import Enum
 from typing import Dict, List, Optional, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 import structlog
 
@@ -143,6 +143,9 @@ class DCAStrategy(BaseStrategy):
         # Track last purchase time per symbol
         self.last_purchase: Dict[str, datetime] = {}
         
+        # Database callback for persistence (set by engine)
+        self._db_save_callback: Optional[callable] = None
+        
         # Statistics
         self.total_invested: Dict[str, Decimal] = {s: Decimal("0") for s in symbols}
         self.purchase_count: Dict[str, int] = {s: 0 for s in symbols}
@@ -169,6 +172,57 @@ class DCAStrategy(BaseStrategy):
                 if keyword.upper() in upper:
                     return symbol
         return None
+    
+    def set_db_save_callback(self, callback: callable):
+        """
+        Set callback for saving last_purchase to database.
+        
+        Args:
+            callback: Async function callback(strategy_name, symbol, last_purchase)
+        """
+        self._db_save_callback = callback
+    
+    async def load_last_purchase_times(self, load_func: callable) -> Dict[str, datetime]:
+        """
+        Load last purchase times from database.
+        
+        Args:
+            load_func: Async function that returns Dict[str, datetime] of symbol->timestamp
+            
+        Returns:
+            Dictionary of loaded last_purchase times
+        """
+        try:
+            loaded = await load_func()
+            if loaded:
+                self.last_purchase.update(loaded)
+                self.logger.info(
+                    "core_hodl.last_purchase_loaded",
+                    symbols=list(loaded.keys()),
+                    count=len(loaded)
+                )
+            return loaded
+        except Exception as e:
+            self.logger.warning("core_hodl.last_purchase_load_failed", error=str(e))
+            return {}
+    
+    async def _save_last_purchase(self, symbol: str, timestamp: datetime):
+        """
+        Save last purchase time to database if callback is set.
+        
+        Args:
+            symbol: Trading pair symbol
+            timestamp: Purchase timestamp
+        """
+        if self._db_save_callback:
+            try:
+                await self._db_save_callback(self.name, symbol, timestamp)
+            except Exception as e:
+                self.logger.warning(
+                    "core_hodl.last_purchase_save_failed",
+                    symbol=symbol,
+                    error=str(e)
+                )
     
     def get_state(self) -> CoreHodlState:
         """Get current strategy state."""
@@ -368,7 +422,7 @@ class DCAStrategy(BaseStrategy):
                 if needs_rebalance:
                     self._state = CoreHodlState.REBALANCING
                     self._rebalance_week = 0
-                    self._rebalance_start_time = datetime.utcnow()
+                    self._rebalance_start_time = datetime.now(timezone.utc)
                     self.logger.info(
                         "core_hodl.state_change",
                         from_state="deploying",
@@ -387,7 +441,7 @@ class DCAStrategy(BaseStrategy):
         elif self._state == CoreHodlState.REBALANCING:
             # Check if rebalancing period is complete
             if self._rebalance_start_time:
-                weeks_elapsed = (datetime.utcnow() - self._rebalance_start_time).days / 7
+                weeks_elapsed = (datetime.now(timezone.utc) - self._rebalance_start_time).days / 7
                 if weeks_elapsed >= 4:
                     self._state = CoreHodlState.MAINTAINING
                     self._rebalance_week = 0
@@ -405,7 +459,7 @@ class DCAStrategy(BaseStrategy):
             if needs_rebalance:
                 self._state = CoreHodlState.REBALANCING
                 self._rebalance_week = 0
-                self._rebalance_start_time = datetime.utcnow()
+                self._rebalance_start_time = datetime.now(timezone.utc)
                 self.logger.info(
                     "core_hodl.state_change",
                     from_state="maintaining",
@@ -462,7 +516,7 @@ class DCAStrategy(BaseStrategy):
             List of TradingSignal objects (BUY signals only, no SELL)
         """
         signals = []
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         
         for symbol in self.symbols:
             if symbol not in data or not data[symbol]:
@@ -491,8 +545,9 @@ class DCAStrategy(BaseStrategy):
                 else:
                     reason = "maintenance"
                 
-                # Update last_purchase when signal is created (not when order fills)
-                # This prevents duplicate signals while waiting for order execution
+                # Update last_purchase in memory to prevent duplicate signals
+                # during the same analysis cycle. Database save happens in 
+                # on_order_filled() only when orders actually execute.
                 self.last_purchase[symbol] = now
                 
                 signals.append(self._create_buy_signal(symbol, last_price, buy_amount, reason))
@@ -562,6 +617,12 @@ class DCAStrategy(BaseStrategy):
             if symbol not in self.current_positions:
                 self.current_positions[symbol] = Decimal("0")
             self.current_positions[symbol] += order_value
+            
+            # Save last_purchase to database only when order actually fills
+            # This ensures persistence across restarts without saving rejected signals
+            now = datetime.now(timezone.utc)
+            self.last_purchase[symbol] = now
+            await self._save_last_purchase(symbol, now)
             
             # Decrement deployment weeks if in deploying phase
             # Only decrement once per weekly cycle, not per coin
@@ -667,7 +728,7 @@ class DCAStrategy(BaseStrategy):
             return timedelta(0)
         
         next_purchase = self.last_purchase[symbol] + timedelta(hours=self.interval_hours)
-        remaining = next_purchase - datetime.utcnow()
+        remaining = next_purchase - datetime.now(timezone.utc)
         
         return remaining if remaining.total_seconds() > 0 else timedelta(0)
     

@@ -123,6 +123,12 @@ class TradingModeConfig(BaseSettings):
         env="PERP_SYMBOLS"
     )
     
+    # CORE-HODL specific symbols (BTC/ETH only per AGENTS.md)
+    core_hodl_symbols_str: str = Field(
+        default="BTCUSDT,ETHUSDT",
+        env="CORE_HODL_SYMBOLS"
+    )
+    
     @property
     def default_symbols(self) -> List[str]:
         """Parse default_symbols string into list."""
@@ -132,6 +138,11 @@ class TradingModeConfig(BaseSettings):
     def perp_symbols(self) -> List[str]:
         """Parse perp_symbols string into list."""
         return [s.strip() for s in self.perp_symbols_str.split(",") if s.strip()]
+    
+    @property
+    def core_hodl_symbols(self) -> List[str]:
+        """Parse CORE-HODL symbols string into list (BTC/ETH only)."""
+        return [s.strip() for s in self.core_hodl_symbols_str.split(",") if s.strip()]
 
 
 # =============================================================================
@@ -673,6 +684,12 @@ class TradingConfig(BaseSettings):
         env="DEFAULT_SYMBOLS"
     )
     
+    # CORE-HODL specific symbols (BTC/ETH only per AGENTS.md)
+    core_hodl_symbols_str: str = Field(
+        default="BTCUSDT,ETHUSDT",
+        env="CORE_HODL_SYMBOLS"
+    )
+    
     # Risk Management - HARD LIMITS
     max_position_pct: float = Field(default=5.0, env="MAX_POSITION_PCT")
     max_daily_loss_pct: float = Field(default=2.0, env="MAX_DAILY_LOSS_PCT")
@@ -689,6 +706,11 @@ class TradingConfig(BaseSettings):
     def default_symbols(self) -> List[str]:
         """Parse default_symbols string into list."""
         return [s.strip() for s in self.default_symbols_str.split(",") if s.strip()]
+    
+    @property
+    def core_hodl_symbols(self) -> List[str]:
+        """Parse CORE-HODL symbols string into list."""
+        return [s.strip() for s in self.core_hodl_symbols_str.split(",") if s.strip()]
     
     @field_validator("trading_mode")
     @classmethod
