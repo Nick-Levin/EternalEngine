@@ -208,7 +208,22 @@ run-paper: verify-paper ## Run in paper trading mode
 verify-demo:
 	@echo "$(BLUE)Verifying DEMO trading mode...$(NC)"
 	@grep -q "BYBIT_API_MODE=demo" .env 2>/dev/null || (echo "$(YELLOW)Warning: BYBIT_API_MODE not set to demo in .env$(NC)"; exit 1)
-	@echo "$(GREEN)✓ Demo mode verified$(NC)"
+	@echo "$(GREEN)✓ Demo mode configuration found$(NC)"
+	@echo "$(BLUE)Checking API keys...$(NC)"
+	@KEY=$$(grep "^BYBIT_DEMO_API_KEY=" .env | cut -d'=' -f2); \
+	if [ -z "$$KEY" ] || [ "$$KEY" = "your_demo_key_here" ] || [ "$${#KEY}" -lt 10 ]; then \
+		echo "$(RED)ERROR: Invalid or placeholder BYBIT_DEMO_API_KEY$(NC)"; \
+		echo "$(YELLOW)You need to generate Demo API keys from Bybit:$(NC)"; \
+		echo "  1. Log in to https://www.bybit.com/"; \
+		echo "  2. Go to: Account & Security → API Management"; \
+		echo "  3. Click 'Create New Key' → 'Demo Trading'"; \
+		echo "  4. Enable permissions: Read, Spot Trade, Derivatives Trade"; \
+		echo "  5. Copy API Key and Secret to .env file"; \
+		exit 1; \
+	fi
+	@echo "$(GREEN)✓ API key format looks valid$(NC)"
+	@echo "$(YELLOW)NOTE: If you still get 'API key invalid' error, the key may be revoked or expired.$(NC)"
+	@echo "$(YELLOW)      Generate new keys from Bybit and update .env file.$(NC)"
 
 run-demo: verify-demo ## Run in DEMO mode (Bybit Demo Trading - real market, fake money)
 	@echo "$(GREEN)╔══════════════════════════════════════════════════════════════╗$(NC)"
