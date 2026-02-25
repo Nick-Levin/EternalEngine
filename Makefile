@@ -7,7 +7,7 @@
 # =============================================================================
 
 .PHONY: help setup install test test-unit test-integration test-cov lint format type-check security \
-        check status logs logs-tail clean update-deps run-paper run-live verify-paper verify-live \
+        check status logs logs-tail clean update-deps run-paper run-demo run-live verify-paper verify-demo verify-live \
         backtest backtest-3y backtest-5y backtest-8y backtest-multi backtest-report
 
 # ------------------------------------------------------------------------------
@@ -53,8 +53,11 @@ help: ## Show all available commands
 	@echo "  $(BLUE)make logs-tail$(NC)   - Follow logs in real-time"
 	@echo "  $(BLUE)make clean$(NC)       - Clean generated files"
 	@echo ""
-	@echo "$(GREEN)Trading - Paper Mode (Safe):$(NC)"
+	@echo "$(GREEN)Trading - Paper Mode (Simulated):$(NC)"
 	@echo "  $(GREEN)make run-paper$(NC)   - Start in paper trading mode"
+	@echo ""
+	@echo "$(BLUE)Trading - Demo Mode (Bybit Demo Trading):$(NC)"
+	@echo "  $(BLUE)make run-demo$(NC)    - Start in DEMO mode (real market, fake money)"
 	@echo ""
 	@echo "$(RED)Trading - Live Mode (Real Money!):$(NC)"
 	@echo "  $(RED)make run-live$(NC)    - Start in LIVE trading mode"
@@ -198,6 +201,22 @@ run-paper: verify-paper ## Run in paper trading mode
 	@echo "$(GREEN)║  No real funds will be used                                  ║$(NC)"
 	@echo "$(GREEN)╚══════════════════════════════════════════════════════════════╝$(NC)"
 	$(PYTHON_VENV) main.py --mode paper
+
+# ------------------------------------------------------------------------------
+# Trading - Demo Mode (Bybit Demo Trading)
+# ------------------------------------------------------------------------------
+verify-demo:
+	@echo "$(BLUE)Verifying DEMO trading mode...$(NC)"
+	@grep -q "BYBIT_API_MODE=demo" .env 2>/dev/null || (echo "$(YELLOW)Warning: BYBIT_API_MODE not set to demo in .env$(NC)"; exit 1)
+	@echo "$(GREEN)✓ Demo mode verified$(NC)"
+
+run-demo: verify-demo ## Run in DEMO mode (Bybit Demo Trading - real market, fake money)
+	@echo "$(GREEN)╔══════════════════════════════════════════════════════════════╗$(NC)"
+	@echo "$(GREEN)║  Starting The Eternal Engine in DEMO trading mode            ║$(NC)"
+	@echo "$(GREEN)║  Using Bybit Demo Trading API                                ║$(NC)"
+	@echo "$(GREEN)║  Real market data, fake money - NO REAL FUNDS AT RISK        ║$(NC)"
+	@echo "$(GREEN)╚══════════════════════════════════════════════════════════════╝$(NC)"
+	$(PYTHON_VENV) main.py --mode demo
 
 # ------------------------------------------------------------------------------
 # Trading - Live Mode (Real Money!)
