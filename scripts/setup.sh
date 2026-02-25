@@ -184,86 +184,29 @@ create_directories() {
 }
 
 setup_environment_file() {
-    log_step "Setting up environment configuration..."
+    log_step "Checking environment configuration..."
     
     local env_file="${PROJECT_ROOT}/.env"
-    local env_example="${PROJECT_ROOT}/.env.example"
     
     if [[ -f "$env_file" ]]; then
-        log_warning ".env file already exists"
-        read -rp "Overwrite with fresh template? [y/N]: " response
-        if [[ ! "$response" =~ ^[Yy]$ ]]; then
-            log_success "Keeping existing .env file"
-            return 0
+        log_success ".env configuration file found"
+        
+        # Verify it has been customized
+        if grep -q "your_demo_key_here\|your_prod_key_here" "$env_file" 2>/dev/null; then
+            log_warning "API keys not configured yet (still have placeholders)"
+            log_info "For paper trading: No changes needed (starts in demo mode)"
+            log_info "For live trading: Edit .env and add your Bybit API keys"
+        else
+            log_success "API keys appear to be configured"
         fi
-        cp "$env_file" "${env_file}.backup.$(date +%Y%m%d_%H%M%S)"
-        log_info "Backed up existing .env file"
-    fi
-    
-    if [[ ! -f "$env_example" ]]; then
-        log_error ".env.example not found!"
+        
+        return 0
+    else
+        log_error ".env file not found!"
+        log_error "The .env file should be present with default configuration."
+        log_info "Please ensure the .env file exists in: ${PROJECT_ROOT}"
         exit 1
     fi
-    
-    cp "$env_example" "$env_file"
-    log_success "Created .env from template"
-    
-    # Prompt user for configuration
-    echo ""
-    log_info "Let's configure your environment..."
-    echo ""
-    
-    # Ask about API keys
-    echo -e "${CYAN}Choose API key setup:${NC}"
-    echo "  1) Use DEMO keys (recommended for first-time setup)"
-    echo "  2) Use PRODUCTION keys (live trading)"
-    echo "  3) Skip for now (manual configuration later)"
-    echo ""
-    read -rp "Select option [1/2/3] (default: 1): " api_choice
-    api_choice=${api_choice:-1}
-    
-    case "$api_choice" in
-        1)
-            log_info "Configuring DEMO (testnet) mode..."
-            sed -i.bak "s/BYBIT_API_MODE=demo/BYBIT_API_MODE=demo/" "$env_file" 2>/dev/null || true
-            sed -i.bak "s/BYBIT_DEMO_API_KEY=.*/BYBIT_DEMO_API_KEY=${DEMO_KEY}/" "$env_file" 2>/dev/null || true
-            sed -i.bak "s/BYBIT_DEMO_API_SECRET=.*/BYBIT_DEMO_API_SECRET=${DEMO_SECRET}/" "$env_file" 2>/dev/null || true
-            sed -i.bak "s/TRADING_MODE=.*/TRADING_MODE=paper/" "$env_file" 2>/dev/null || true
-            sed -i.bak "s/BYBIT_TESTNET=.*/BYBIT_TESTNET=true/" "$env_file" 2>/dev/null || true
-            rm -f "${env_file}.bak" 2>/dev/null || true
-            log_success "DEMO keys configured automatically"
-            log_info "You can start paper trading immediately!"
-            ;;
-        2)
-            log_info "Configuring for PRODUCTION mode..."
-            echo ""
-            log_warning "⚠️  You are setting up for LIVE trading with REAL money!"
-            read -rp "Do you have Bybit API keys ready? [y/N]: " has_keys
-            
-            if [[ "$has_keys" =~ ^[Yy]$ ]]; then
-                read -rp "Enter your Bybit API Key: " prod_key
-                read -rsp "Enter your Bybit API Secret: " prod_secret
-                echo ""
-                
-                sed -i.bak "s/BYBIT_API_MODE=.*/BYBIT_API_MODE=prod/" "$env_file" 2>/dev/null || true
-                sed -i.bak "s/BYBIT_PROD_API_KEY=.*/BYBIT_PROD_API_KEY=${prod_key}/" "$env_file" 2>/dev/null || true
-                sed -i.bak "s/BYBIT_PROD_API_SECRET=.*/BYBIT_PROD_API_SECRET=${prod_secret}/" "$env_file" 2>/dev/null || true
-                rm -f "${env_file}.bak" 2>/dev/null || true
-                
-                log_success "Production keys configured"
-                log_warning "⚠️  Remember: Trading mode is still set to 'paper' by default"
-                log_info "Edit .env and set TRADING_MODE=live when ready"
-            else
-                log_info "No problem! You can add your keys later by editing .env"
-            fi
-            ;;
-        *)
-            log_info "Skipping API configuration. You'll need to edit .env manually."
-            ;;
-    esac
-    
-    # Clean up backup files created by sed
-    rm -f "${env_file}.bak" 2>/dev/null || true
 }
 
 initialize_database() {

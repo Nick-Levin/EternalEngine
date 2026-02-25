@@ -1,41 +1,56 @@
 """Database storage for trading data using SQLAlchemy 2.0 with async support."""
-from typing import List, Optional, Dict, Any
+
 from datetime import datetime, timezone
 from decimal import Decimal
-from sqlalchemy import (
-    String, DateTime, Numeric, Integer, JSON, select, and_
-)
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy.ext.asyncio import AsyncEngine
+from typing import Any, Dict, List, Optional
 
-from src.core.models import Order, Position, Trade, OrderSide, OrderType, OrderStatus, PositionSide
+from sqlalchemy import JSON, DateTime, Integer, Numeric, String, and_, select
+from sqlalchemy.ext.asyncio import (AsyncEngine, AsyncSession,
+                                    async_sessionmaker, create_async_engine)
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
 from src.core.config import database_config
+from src.core.models import (Order, OrderSide, OrderStatus, OrderType,
+                             Position, PositionSide, Trade)
 
 
 class Base(DeclarativeBase):
     """SQLAlchemy 2.0 declarative base."""
+
     pass
 
 
 class OrderModel(Base):
     """SQLAlchemy model for orders - history and active orders."""
-    __tablename__ = 'orders'
-    
+
+    __tablename__ = "orders"
+
     id: Mapped[str] = mapped_column(String, primary_key=True)
     exchange_order_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    engine_name: Mapped[Optional[str]] = mapped_column(String, nullable=True, index=True)
+    engine_name: Mapped[Optional[str]] = mapped_column(
+        String, nullable=True, index=True
+    )
     symbol: Mapped[str] = mapped_column(String, nullable=False, index=True)
     side: Mapped[str] = mapped_column(String, nullable=False)
     order_type: Mapped[str] = mapped_column(String, nullable=False)
     amount: Mapped[Decimal] = mapped_column(Numeric(36, 18), nullable=False)
     price: Mapped[Optional[Decimal]] = mapped_column(Numeric(36, 18), nullable=True)
-    filled_amount: Mapped[Decimal] = mapped_column(Numeric(36, 18), default=Decimal("0"))
-    average_price: Mapped[Optional[Decimal]] = mapped_column(Numeric(36, 18), nullable=True)
-    stop_loss_price: Mapped[Optional[Decimal]] = mapped_column(Numeric(36, 18), nullable=True)
-    take_profit_price: Mapped[Optional[Decimal]] = mapped_column(Numeric(36, 18), nullable=True)
+    filled_amount: Mapped[Decimal] = mapped_column(
+        Numeric(36, 18), default=Decimal("0")
+    )
+    average_price: Mapped[Optional[Decimal]] = mapped_column(
+        Numeric(36, 18), nullable=True
+    )
+    stop_loss_price: Mapped[Optional[Decimal]] = mapped_column(
+        Numeric(36, 18), nullable=True
+    )
+    take_profit_price: Mapped[Optional[Decimal]] = mapped_column(
+        Numeric(36, 18), nullable=True
+    )
     status: Mapped[str] = mapped_column(String, nullable=False, index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     filled_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     metadata_json: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
@@ -43,28 +58,42 @@ class OrderModel(Base):
 
 class PositionModel(Base):
     """SQLAlchemy model for open positions."""
-    __tablename__ = 'positions'
-    
+
+    __tablename__ = "positions"
+
     id: Mapped[str] = mapped_column(String, primary_key=True)
-    engine_name: Mapped[Optional[str]] = mapped_column(String, nullable=True, index=True)
+    engine_name: Mapped[Optional[str]] = mapped_column(
+        String, nullable=True, index=True
+    )
     symbol: Mapped[str] = mapped_column(String, nullable=False, index=True)
     side: Mapped[str] = mapped_column(String, nullable=False)
     entry_price: Mapped[Decimal] = mapped_column(Numeric(36, 18), nullable=False)
     amount: Mapped[Decimal] = mapped_column(Numeric(36, 18), nullable=False)
-    opened_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
-    unrealized_pnl: Mapped[Decimal] = mapped_column(Numeric(36, 18), default=Decimal("0"))
+    opened_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+    unrealized_pnl: Mapped[Decimal] = mapped_column(
+        Numeric(36, 18), default=Decimal("0")
+    )
     realized_pnl: Mapped[Decimal] = mapped_column(Numeric(36, 18), default=Decimal("0"))
-    stop_loss_price: Mapped[Optional[Decimal]] = mapped_column(Numeric(36, 18), nullable=True)
-    take_profit_price: Mapped[Optional[Decimal]] = mapped_column(Numeric(36, 18), nullable=True)
+    stop_loss_price: Mapped[Optional[Decimal]] = mapped_column(
+        Numeric(36, 18), nullable=True
+    )
+    take_profit_price: Mapped[Optional[Decimal]] = mapped_column(
+        Numeric(36, 18), nullable=True
+    )
     metadata_json: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
 
 
 class TradeModel(Base):
     """SQLAlchemy model for completed trades."""
-    __tablename__ = 'trades'
-    
+
+    __tablename__ = "trades"
+
     id: Mapped[str] = mapped_column(String, primary_key=True)
-    engine_name: Mapped[Optional[str]] = mapped_column(String, nullable=True, index=True)
+    engine_name: Mapped[Optional[str]] = mapped_column(
+        String, nullable=True, index=True
+    )
     symbol: Mapped[str] = mapped_column(String, nullable=False, index=True)
     side: Mapped[str] = mapped_column(String, nullable=False)
     entry_price: Mapped[Decimal] = mapped_column(Numeric(36, 18), nullable=False)
@@ -83,53 +112,69 @@ class TradeModel(Base):
 
 class PortfolioSnapshotModel(Base):
     """SQLAlchemy model for portfolio value over time."""
-    __tablename__ = 'portfolio_snapshots'
-    
+
+    __tablename__ = "portfolio_snapshots"
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc), index=True
+    )
     total_equity: Mapped[Decimal] = mapped_column(Numeric(36, 18), nullable=False)
     available_balance: Mapped[Decimal] = mapped_column(Numeric(36, 18), nullable=False)
     engine_allocations: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
-    positions_value: Mapped[Decimal] = mapped_column(Numeric(36, 18), default=Decimal("0"))
-    drawdown_from_ath: Mapped[Decimal] = mapped_column(Numeric(36, 18), default=Decimal("0"))
+    positions_value: Mapped[Decimal] = mapped_column(
+        Numeric(36, 18), default=Decimal("0")
+    )
+    drawdown_from_ath: Mapped[Decimal] = mapped_column(
+        Numeric(36, 18), default=Decimal("0")
+    )
     metadata_json: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
 
 
 class EngineStateModel(Base):
     """SQLAlchemy model for state tracking for each engine."""
-    __tablename__ = 'engine_states'
-    
+
+    __tablename__ = "engine_states"
+
     engine_name: Mapped[str] = mapped_column(String, primary_key=True)
     state: Mapped[str] = mapped_column(String, nullable=False)
     allocation_pct: Mapped[Decimal] = mapped_column(Numeric(10, 4), nullable=False)
     performance_metrics: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
-    last_updated: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    last_updated: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
 
 
 class DCAStateModel(Base):
     """SQLAlchemy model for DCA strategy state persistence.
-    
+
     Stores last purchase timestamps to survive bot restarts.
     """
-    __tablename__ = 'dca_state'
-    
+
+    __tablename__ = "dca_state"
+
     strategy_name: Mapped[str] = mapped_column(String, primary_key=True)
     symbol: Mapped[str] = mapped_column(String, primary_key=True)
     last_purchase: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, 
+        DateTime,
         default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc)
+        onupdate=lambda: datetime.now(timezone.utc),
     )
 
 
 class CircuitBreakerEventModel(Base):
     """SQLAlchemy model for circuit breaker triggers."""
-    __tablename__ = 'circuit_breaker_events'
-    
+
+    __tablename__ = "circuit_breaker_events"
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     level: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
-    timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc), index=True
+    )
     trigger_reason: Mapped[str] = mapped_column(String, nullable=False)
     portfolio_value: Mapped[Decimal] = mapped_column(Numeric(36, 18), nullable=False)
     drawdown_pct: Mapped[Decimal] = mapped_column(Numeric(10, 4), nullable=False)
@@ -138,66 +183,93 @@ class CircuitBreakerEventModel(Base):
 
 class DailyStatsModel(Base):
     """SQLAlchemy model for daily performance stats per engine."""
-    __tablename__ = 'daily_stats'
-    
+
+    __tablename__ = "daily_stats"
+
     date: Mapped[str] = mapped_column(String, primary_key=True)
     engine_name: Mapped[str] = mapped_column(String, primary_key=True)
     starting_balance: Mapped[Decimal] = mapped_column(Numeric(36, 18), nullable=False)
-    ending_balance: Mapped[Optional[Decimal]] = mapped_column(Numeric(36, 18), nullable=True)
+    ending_balance: Mapped[Optional[Decimal]] = mapped_column(
+        Numeric(36, 18), nullable=True
+    )
     total_pnl: Mapped[Decimal] = mapped_column(Numeric(36, 18), default=Decimal("0"))
     trade_count: Mapped[int] = mapped_column(Integer, default=0)
     win_count: Mapped[int] = mapped_column(Integer, default=0)
     loss_count: Mapped[int] = mapped_column(Integer, default=0)
 
 
+class FullEngineStateModel(Base):
+    """SQLAlchemy model for complete engine state persistence.
+
+    Stores all critical internal engine state to survive restarts.
+    Includes engine-specific fields like DCA tracking, positions, etc.
+    """
+
+    __tablename__ = "full_engine_states"
+
+    engine_name: Mapped[str] = mapped_column(String, primary_key=True)
+    state_json: Mapped[Dict[str, Any]] = mapped_column(JSON, nullable=False)
+    saved_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+
 class Database:
     """Async database interface for The Eternal Engine."""
-    
+
     def __init__(self, database_url: Optional[str] = None):
         """
         Initialize database connection.
-        
+
         Args:
             database_url: Database URL. If None, uses config value.
         """
         db_url = database_url or database_config.database_url
-        
+
         # Convert SQLite URL to async version if needed
-        if db_url.startswith('sqlite:///') and not db_url.startswith('sqlite+aiosqlite:///'):
-            db_url = db_url.replace('sqlite:///', 'sqlite+aiosqlite:///')
-        
+        if db_url.startswith("sqlite:///") and not db_url.startswith(
+            "sqlite+aiosqlite:///"
+        ):
+            db_url = db_url.replace("sqlite:///", "sqlite+aiosqlite:///")
+
         self.engine: AsyncEngine = create_async_engine(db_url, echo=False)
-        self.session_maker = async_sessionmaker(self.engine, class_=AsyncSession, expire_on_commit=False)
-    
+        self.session_maker = async_sessionmaker(
+            self.engine, class_=AsyncSession, expire_on_commit=False
+        )
+
     async def initialize(self):
         """Create all database tables."""
         async with self.engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
-    
+
     async def close(self):
         """Close database connection and cleanup resources."""
         await self.engine.dispose()
-    
+
     # Order operations
-    async def save_order(self, order: Order, engine_name: Optional[str] = None) -> Order:
+    async def save_order(
+        self, order: Order, engine_name: Optional[str] = None
+    ) -> Order:
         """
         Save or update an order.
-        
+
         Args:
             order: Order object to save
             engine_name: Optional engine name for tracking
-            
+
         Returns:
             The saved Order object
         """
         async with self.session_maker() as session:
             db_order = await session.get(OrderModel, order.id)
-            
+
             if db_order is None:
                 db_order = OrderModel(
                     id=order.id,
                     exchange_order_id=order.exchange_order_id,
-                    engine_name=engine_name or order.metadata.get('engine_name'),
+                    engine_name=engine_name or order.metadata.get("engine_name"),
                     symbol=order.symbol,
                     side=order.side.value,
                     order_type=order.order_type.value,
@@ -211,7 +283,7 @@ class Database:
                     created_at=order.created_at,
                     updated_at=order.updated_at,
                     filled_at=order.filled_at,
-                    metadata_json=order.metadata
+                    metadata_json=order.metadata,
                 )
                 session.add(db_order)
             else:
@@ -222,104 +294,108 @@ class Database:
                 db_order.filled_at = order.filled_at
                 if engine_name:
                     db_order.engine_name = engine_name
-            
+
             await session.commit()
             return order
-    
+
     async def get_order(self, order_id: str) -> Optional[Order]:
         """
         Get an order by ID.
-        
+
         Args:
             order_id: The order ID to look up
-            
+
         Returns:
             Order object or None if not found
         """
         async with self.session_maker() as session:
             db_order = await session.get(OrderModel, order_id)
-            
+
             if db_order is None:
                 return None
-            
+
             return self._order_from_model(db_order)
-    
+
     async def get_open_orders(self, engine: Optional[str] = None) -> List[Order]:
         """
         Get all open (active) orders.
-        
+
         Args:
             engine: Optional engine name filter
-            
+
         Returns:
             List of active Order objects
         """
         async with self.session_maker() as session:
-            active_statuses = ['pending', 'open', 'partially_filled']
+            active_statuses = ["pending", "open", "partially_filled"]
             query = select(OrderModel).where(OrderModel.status.in_(active_statuses))
-            
+
             if engine:
                 query = query.where(OrderModel.engine_name == engine)
-            
+
             query = query.order_by(OrderModel.created_at.desc())
             result = await session.execute(query)
             db_orders = result.scalars().all()
-            
+
             return [self._order_from_model(o) for o in db_orders]
-    
+
     async def get_orders(
-        self, 
-        symbol: Optional[str] = None, 
+        self,
+        symbol: Optional[str] = None,
         status: Optional[str] = None,
         engine: Optional[str] = None,
-        limit: int = 100
+        limit: int = 100,
     ) -> List[Order]:
         """
         Get orders with optional filters.
-        
+
         Args:
             symbol: Filter by symbol
             status: Filter by status
             engine: Filter by engine name
             limit: Maximum number of results
-            
+
         Returns:
             List of Order objects
         """
         async with self.session_maker() as session:
-            query = select(OrderModel).order_by(OrderModel.created_at.desc()).limit(limit)
-            
+            query = (
+                select(OrderModel).order_by(OrderModel.created_at.desc()).limit(limit)
+            )
+
             if symbol:
                 query = query.where(OrderModel.symbol == symbol)
             if status:
                 query = query.where(OrderModel.status == status)
             if engine:
                 query = query.where(OrderModel.engine_name == engine)
-            
+
             result = await session.execute(query)
             db_orders = result.scalars().all()
-            
+
             return [self._order_from_model(o) for o in db_orders]
-    
+
     # Position operations
-    async def save_position(self, position: Position, engine_name: Optional[str] = None) -> Position:
+    async def save_position(
+        self, position: Position, engine_name: Optional[str] = None
+    ) -> Position:
         """
         Save or update a position.
-        
+
         Args:
             position: Position object to save
             engine_name: Optional engine name for tracking
-            
+
         Returns:
             The saved Position object
         """
         async with self.session_maker() as session:
             db_position = await session.get(PositionModel, position.id)
-            
+
             if db_position is None:
                 db_position = PositionModel(
                     id=position.id,
-                    engine_name=engine_name or position.metadata.get('engine_name'),
+                    engine_name=engine_name or position.metadata.get("engine_name"),
                     symbol=position.symbol,
                     side=position.side.value,
                     entry_price=position.entry_price,
@@ -329,7 +405,7 @@ class Database:
                     realized_pnl=position.realized_pnl,
                     stop_loss_price=position.stop_loss_price,
                     take_profit_price=position.take_profit_price,
-                    metadata_json=position.metadata
+                    metadata_json=position.metadata,
                 )
                 session.add(db_position)
             else:
@@ -339,86 +415,90 @@ class Database:
                 db_position.realized_pnl = position.realized_pnl
                 if engine_name:
                     db_position.engine_name = engine_name
-            
+
             await session.commit()
             return position
-    
-    async def get_position(self, symbol: str, engine: Optional[str] = None) -> Optional[Position]:
+
+    async def get_position(
+        self, symbol: str, engine: Optional[str] = None
+    ) -> Optional[Position]:
         """
         Get position for a symbol.
-        
+
         Args:
             symbol: Trading pair symbol
             engine: Optional engine name filter
-            
+
         Returns:
             Position object or None if not found
         """
         async with self.session_maker() as session:
             query = select(PositionModel).where(PositionModel.symbol == symbol)
-            
+
             if engine:
                 query = query.where(PositionModel.engine_name == engine)
-            
+
             result = await session.execute(query)
             db_position = result.scalar_one_or_none()
-            
+
             if db_position is None:
                 return None
-            
+
             return self._position_from_model(db_position)
-    
+
     async def get_open_positions(self, engine: Optional[str] = None) -> List[Position]:
         """
         Get all open positions.
-        
+
         Args:
             engine: Optional engine name filter
-            
+
         Returns:
             List of open Position objects
         """
         async with self.session_maker() as session:
             query = select(PositionModel)
-            
+
             if engine:
                 query = query.where(PositionModel.engine_name == engine)
-            
+
             result = await session.execute(query)
             db_positions = result.scalars().all()
-            
+
             return [self._position_from_model(p) for p in db_positions]
-    
+
     async def delete_position(self, symbol: str, engine: Optional[str] = None):
         """
         Delete a position.
-        
+
         Args:
             symbol: Trading pair symbol
             engine: Optional engine name filter
         """
         async with self.session_maker() as session:
             query = select(PositionModel).where(PositionModel.symbol == symbol)
-            
+
             if engine:
                 query = query.where(PositionModel.engine_name == engine)
-            
+
             result = await session.execute(query)
             db_position = result.scalar_one_or_none()
-            
+
             if db_position:
                 await session.delete(db_position)
                 await session.commit()
-    
+
     # Trade operations
-    async def save_trade(self, trade: Trade, engine_name: Optional[str] = None) -> Trade:
+    async def save_trade(
+        self, trade: Trade, engine_name: Optional[str] = None
+    ) -> Trade:
         """
         Save a completed trade.
-        
+
         Args:
             trade: Trade object to save
             engine_name: Optional engine name for tracking
-            
+
         Returns:
             The saved Trade object
         """
@@ -439,42 +519,44 @@ class Database:
                 exit_fee=trade.exit_fee,
                 total_fee=trade.total_fee,
                 close_reason=trade.close_reason,
-                metadata_json=getattr(trade, 'metadata', {})
+                metadata_json=getattr(trade, "metadata", {}),
             )
             session.add(db_trade)
             await session.commit()
             return trade
-    
+
     async def get_trades(
-        self, 
+        self,
         engine: Optional[str] = None,
         symbol: Optional[str] = None,
-        limit: int = 100
+        limit: int = 100,
     ) -> List[Trade]:
         """
         Get completed trades.
-        
+
         Args:
             engine: Filter by engine name
             symbol: Filter by symbol
             limit: Maximum number of results
-            
+
         Returns:
             List of Trade objects
         """
         async with self.session_maker() as session:
-            query = select(TradeModel).order_by(TradeModel.exit_time.desc()).limit(limit)
-            
+            query = (
+                select(TradeModel).order_by(TradeModel.exit_time.desc()).limit(limit)
+            )
+
             if engine:
                 query = query.where(TradeModel.engine_name == engine)
             if symbol:
                 query = query.where(TradeModel.symbol == symbol)
-            
+
             result = await session.execute(query)
             db_trades = result.scalars().all()
-            
+
             return [self._trade_from_model(t) for t in db_trades]
-    
+
     # Portfolio snapshot operations
     async def save_portfolio_snapshot(
         self,
@@ -483,11 +565,11 @@ class Database:
         engine_allocations: Dict[str, Any],
         positions_value: Decimal = Decimal("0"),
         drawdown_from_ath: Decimal = Decimal("0"),
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> int:
         """
         Save a portfolio snapshot.
-        
+
         Args:
             total_equity: Total portfolio equity
             available_balance: Available cash balance
@@ -495,7 +577,7 @@ class Database:
             positions_value: Total value of open positions
             drawdown_from_ath: Current drawdown from all-time high
             metadata: Additional metadata
-            
+
         Returns:
             Snapshot ID
         """
@@ -506,49 +588,53 @@ class Database:
                 engine_allocations=engine_allocations,
                 positions_value=positions_value,
                 drawdown_from_ath=drawdown_from_ath,
-                metadata_json=metadata or {}
+                metadata_json=metadata or {},
             )
             session.add(snapshot)
             await session.commit()
             return snapshot.id
-    
+
     async def get_latest_portfolio_snapshot(self) -> Optional[Dict[str, Any]]:
         """
         Get the most recent portfolio snapshot.
-        
+
         Returns:
             Snapshot data as dict or None
         """
         async with self.session_maker() as session:
-            query = select(PortfolioSnapshotModel).order_by(PortfolioSnapshotModel.timestamp.desc()).limit(1)
+            query = (
+                select(PortfolioSnapshotModel)
+                .order_by(PortfolioSnapshotModel.timestamp.desc())
+                .limit(1)
+            )
             result = await session.execute(query)
             snapshot = result.scalar_one_or_none()
-            
+
             if snapshot is None:
                 return None
-            
+
             return {
-                'id': snapshot.id,
-                'timestamp': snapshot.timestamp,
-                'total_equity': snapshot.total_equity,
-                'available_balance': snapshot.available_balance,
-                'engine_allocations': snapshot.engine_allocations,
-                'positions_value': snapshot.positions_value,
-                'drawdown_from_ath': snapshot.drawdown_from_ath,
-                'metadata': snapshot.metadata_json
+                "id": snapshot.id,
+                "timestamp": snapshot.timestamp,
+                "total_equity": snapshot.total_equity,
+                "available_balance": snapshot.available_balance,
+                "engine_allocations": snapshot.engine_allocations,
+                "positions_value": snapshot.positions_value,
+                "drawdown_from_ath": snapshot.drawdown_from_ath,
+                "metadata": snapshot.metadata_json,
             }
-    
+
     # Engine state operations
     async def save_engine_state(
         self,
         engine_name: str,
         state: str,
         allocation_pct: Decimal,
-        performance_metrics: Optional[Dict[str, Any]] = None
+        performance_metrics: Optional[Dict[str, Any]] = None,
     ):
         """
         Save or update engine state.
-        
+
         Args:
             engine_name: Engine identifier (e.g., 'CORE-HODL', 'TREND')
             state: Engine state (e.g., 'active', 'paused', 'stopped')
@@ -557,51 +643,53 @@ class Database:
         """
         async with self.session_maker() as session:
             db_state = await session.get(EngineStateModel, engine_name)
-            
+
             if db_state is None:
                 db_state = EngineStateModel(
                     engine_name=engine_name,
                     state=state,
                     allocation_pct=allocation_pct,
-                    performance_metrics=performance_metrics or {}
+                    performance_metrics=performance_metrics or {},
                 )
                 session.add(db_state)
             else:
                 db_state.state = state
                 db_state.allocation_pct = allocation_pct
-                db_state.performance_metrics = performance_metrics or db_state.performance_metrics
+                db_state.performance_metrics = (
+                    performance_metrics or db_state.performance_metrics
+                )
                 db_state.last_updated = datetime.now(timezone.utc)
-            
+
             await session.commit()
-    
+
     async def get_engine_state(self, engine_name: str) -> Optional[Dict[str, Any]]:
         """
         Get state for a specific engine.
-        
+
         Args:
             engine_name: Engine identifier
-            
+
         Returns:
             Engine state as dict or None
         """
         async with self.session_maker() as session:
             db_state = await session.get(EngineStateModel, engine_name)
-            
+
             if db_state is None:
                 return None
-            
+
             return {
-                'engine_name': db_state.engine_name,
-                'state': db_state.state,
-                'allocation_pct': db_state.allocation_pct,
-                'performance_metrics': db_state.performance_metrics,
-                'last_updated': db_state.last_updated
+                "engine_name": db_state.engine_name,
+                "state": db_state.state,
+                "allocation_pct": db_state.allocation_pct,
+                "performance_metrics": db_state.performance_metrics,
+                "last_updated": db_state.last_updated,
             }
-    
+
     async def get_all_engine_states(self) -> List[Dict[str, Any]]:
         """
         Get states for all engines.
-        
+
         Returns:
             List of engine state dicts
         """
@@ -609,28 +697,25 @@ class Database:
             query = select(EngineStateModel)
             result = await session.execute(query)
             db_states = result.scalars().all()
-            
+
             return [
                 {
-                    'engine_name': s.engine_name,
-                    'state': s.state,
-                    'allocation_pct': s.allocation_pct,
-                    'performance_metrics': s.performance_metrics,
-                    'last_updated': s.last_updated
+                    "engine_name": s.engine_name,
+                    "state": s.state,
+                    "allocation_pct": s.allocation_pct,
+                    "performance_metrics": s.performance_metrics,
+                    "last_updated": s.last_updated,
                 }
                 for s in db_states
             ]
-    
+
     # DCA state operations
     async def save_dca_state(
-        self,
-        strategy_name: str,
-        symbol: str,
-        last_purchase: datetime
+        self, strategy_name: str, symbol: str, last_purchase: datetime
     ):
         """
         Save DCA last purchase timestamp for a symbol.
-        
+
         Args:
             strategy_name: The DCA strategy name
             symbol: Trading pair symbol
@@ -641,37 +726,35 @@ class Database:
             query = select(DCAStateModel).where(
                 and_(
                     DCAStateModel.strategy_name == strategy_name,
-                    DCAStateModel.symbol == symbol
+                    DCAStateModel.symbol == symbol,
                 )
             )
             result = await session.execute(query)
             db_state = result.scalar_one_or_none()
-            
+
             if db_state is None:
                 db_state = DCAStateModel(
                     strategy_name=strategy_name,
                     symbol=symbol,
-                    last_purchase=last_purchase
+                    last_purchase=last_purchase,
                 )
                 session.add(db_state)
             else:
                 db_state.last_purchase = last_purchase
                 db_state.updated_at = datetime.now(timezone.utc)
-            
+
             await session.commit()
-    
+
     async def get_dca_state(
-        self,
-        strategy_name: str,
-        symbol: str
+        self, strategy_name: str, symbol: str
     ) -> Optional[datetime]:
         """
         Get last purchase timestamp for a DCA symbol.
-        
+
         Args:
             strategy_name: The DCA strategy name
             symbol: Trading pair symbol
-            
+
         Returns:
             Last purchase datetime (UTC) or None
         """
@@ -679,27 +762,24 @@ class Database:
             query = select(DCAStateModel).where(
                 and_(
                     DCAStateModel.strategy_name == strategy_name,
-                    DCAStateModel.symbol == symbol
+                    DCAStateModel.symbol == symbol,
                 )
             )
             result = await session.execute(query)
             db_state = result.scalar_one_or_none()
-            
+
             if db_state is None:
                 return None
-            
+
             return db_state.last_purchase
-    
-    async def get_all_dca_states(
-        self,
-        strategy_name: str
-    ) -> Dict[str, datetime]:
+
+    async def get_all_dca_states(self, strategy_name: str) -> Dict[str, datetime]:
         """
         Get all last purchase timestamps for a DCA strategy.
-        
+
         Args:
             strategy_name: The DCA strategy name
-            
+
         Returns:
             Dictionary of symbol -> last_purchase datetime
         """
@@ -709,26 +789,22 @@ class Database:
             )
             result = await session.execute(query)
             db_states = result.scalars().all()
-            
+
             return {s.symbol: s.last_purchase for s in db_states}
-    
+
     # Circuit breaker operations
     async def record_circuit_breaker(
-        self,
-        level: int,
-        reason: str,
-        portfolio_value: Decimal,
-        drawdown_pct: Decimal
+        self, level: int, reason: str, portfolio_value: Decimal, drawdown_pct: Decimal
     ) -> int:
         """
         Record a circuit breaker event.
-        
+
         Args:
             level: Circuit breaker level (1-4)
             reason: Trigger reason description
             portfolio_value: Portfolio value at trigger time
             drawdown_pct: Drawdown percentage
-            
+
         Returns:
             Event ID
         """
@@ -737,16 +813,16 @@ class Database:
                 level=level,
                 trigger_reason=reason,
                 portfolio_value=portfolio_value,
-                drawdown_pct=drawdown_pct
+                drawdown_pct=drawdown_pct,
             )
             session.add(event)
             await session.commit()
             return event.id
-    
+
     async def resolve_circuit_breaker(self, event_id: int):
         """
         Mark a circuit breaker event as resolved.
-        
+
         Args:
             event_id: The circuit breaker event ID
         """
@@ -755,31 +831,33 @@ class Database:
             if event:
                 event.resolved_at = datetime.now(timezone.utc)
                 await session.commit()
-    
+
     async def get_active_circuit_breakers(self) -> List[Dict[str, Any]]:
         """
         Get all unresolved circuit breaker events.
-        
+
         Returns:
             List of active circuit breaker events
         """
         async with self.session_maker() as session:
-            query = select(CircuitBreakerEventModel).where(CircuitBreakerEventModel.resolved_at.is_(None))
+            query = select(CircuitBreakerEventModel).where(
+                CircuitBreakerEventModel.resolved_at.is_(None)
+            )
             result = await session.execute(query)
             events = result.scalars().all()
-            
+
             return [
                 {
-                    'id': e.id,
-                    'level': e.level,
-                    'timestamp': e.timestamp,
-                    'trigger_reason': e.trigger_reason,
-                    'portfolio_value': e.portfolio_value,
-                    'drawdown_pct': e.drawdown_pct
+                    "id": e.id,
+                    "level": e.level,
+                    "timestamp": e.timestamp,
+                    "trigger_reason": e.trigger_reason,
+                    "portfolio_value": e.portfolio_value,
+                    "drawdown_pct": e.drawdown_pct,
                 }
                 for e in events
             ]
-    
+
     # Daily stats operations
     async def save_daily_stats(
         self,
@@ -790,11 +868,11 @@ class Database:
         total_pnl: Decimal = Decimal("0"),
         trade_count: int = 0,
         win_count: int = 0,
-        loss_count: int = 0
+        loss_count: int = 0,
     ):
         """
         Save or update daily statistics.
-        
+
         Args:
             date: Date string (YYYY-MM-DD)
             engine_name: Engine identifier
@@ -808,11 +886,14 @@ class Database:
         async with self.session_maker() as session:
             # Use composite key lookup
             query = select(DailyStatsModel).where(
-                and_(DailyStatsModel.date == date, DailyStatsModel.engine_name == engine_name)
+                and_(
+                    DailyStatsModel.date == date,
+                    DailyStatsModel.engine_name == engine_name,
+                )
             )
             result = await session.execute(query)
             db_stats = result.scalar_one_or_none()
-            
+
             if db_stats is None:
                 db_stats = DailyStatsModel(
                     date=date,
@@ -822,7 +903,7 @@ class Database:
                     total_pnl=total_pnl,
                     trade_count=trade_count,
                     win_count=win_count,
-                    loss_count=loss_count
+                    loss_count=loss_count,
                 )
                 session.add(db_stats)
             else:
@@ -832,51 +913,113 @@ class Database:
                 db_stats.trade_count = trade_count
                 db_stats.win_count = win_count
                 db_stats.loss_count = loss_count
-            
+
             await session.commit()
-    
+
     async def get_daily_stats(
-        self,
-        engine: Optional[str] = None,
-        date: Optional[str] = None,
-        limit: int = 30
+        self, engine: Optional[str] = None, date: Optional[str] = None, limit: int = 30
     ) -> List[Dict[str, Any]]:
         """
         Get daily statistics.
-        
+
         Args:
             engine: Filter by engine name
             date: Filter by specific date
             limit: Maximum number of results
-            
+
         Returns:
             List of daily stats dicts
         """
         async with self.session_maker() as session:
-            query = select(DailyStatsModel).order_by(DailyStatsModel.date.desc()).limit(limit)
-            
+            query = (
+                select(DailyStatsModel)
+                .order_by(DailyStatsModel.date.desc())
+                .limit(limit)
+            )
+
             if engine:
                 query = query.where(DailyStatsModel.engine_name == engine)
             if date:
                 query = query.where(DailyStatsModel.date == date)
-            
+
             result = await session.execute(query)
             db_stats = result.scalars().all()
-            
+
             return [
                 {
-                    'date': s.date,
-                    'engine_name': s.engine_name,
-                    'starting_balance': s.starting_balance,
-                    'ending_balance': s.ending_balance,
-                    'total_pnl': s.total_pnl,
-                    'trade_count': s.trade_count,
-                    'win_count': s.win_count,
-                    'loss_count': s.loss_count
+                    "date": s.date,
+                    "engine_name": s.engine_name,
+                    "starting_balance": s.starting_balance,
+                    "ending_balance": s.ending_balance,
+                    "total_pnl": s.total_pnl,
+                    "trade_count": s.trade_count,
+                    "win_count": s.win_count,
+                    "loss_count": s.loss_count,
                 }
                 for s in db_stats
             ]
-    
+
+    # Full Engine State operations (for restart survivability)
+    async def save_full_engine_state(self, engine_name: str, state: Dict[str, Any]):
+        """
+        Save complete engine state for restart survivability.
+
+        Args:
+            engine_name: Engine identifier (e.g., 'CORE-HODL', 'TREND')
+            state: Complete engine state dictionary (must be JSON serializable)
+        """
+        async with self.session_maker() as session:
+            db_state = await session.get(FullEngineStateModel, engine_name)
+
+            if db_state is None:
+                db_state = FullEngineStateModel(
+                    engine_name=engine_name,
+                    state_json=state,
+                    saved_at=datetime.now(timezone.utc),
+                )
+                session.add(db_state)
+            else:
+                db_state.state_json = state
+                db_state.saved_at = datetime.now(timezone.utc)
+
+            await session.commit()
+
+    async def get_full_engine_state(self, engine_name: str) -> Optional[Dict[str, Any]]:
+        """
+        Load complete engine state for restart recovery.
+
+        Args:
+            engine_name: Engine identifier
+
+        Returns:
+            Complete engine state dictionary or None if not found
+        """
+        async with self.session_maker() as session:
+            db_state = await session.get(FullEngineStateModel, engine_name)
+
+            if db_state is None:
+                return None
+
+            return {
+                "engine_name": db_state.engine_name,
+                "state": db_state.state_json,
+                "saved_at": db_state.saved_at,
+            }
+
+    async def delete_full_engine_state(self, engine_name: str):
+        """
+        Delete full engine state from database.
+
+        Args:
+            engine_name: Engine identifier
+        """
+        async with self.session_maker() as session:
+            db_state = await session.get(FullEngineStateModel, engine_name)
+
+            if db_state:
+                await session.delete(db_state)
+                await session.commit()
+
     # Helpers
     def _order_from_model(self, model: OrderModel) -> Order:
         """Convert DB model to Order object."""
@@ -896,9 +1039,9 @@ class Database:
             created_at=model.created_at,
             updated_at=model.updated_at,
             filled_at=model.filled_at,
-            metadata={**(model.metadata_json or {}), 'engine_name': model.engine_name}
+            metadata={**(model.metadata_json or {}), "engine_name": model.engine_name},
         )
-    
+
     def _position_from_model(self, model: PositionModel) -> Position:
         """Convert DB model to Position object."""
         return Position(
@@ -912,9 +1055,9 @@ class Database:
             realized_pnl=model.realized_pnl,
             stop_loss_price=model.stop_loss_price,
             take_profit_price=model.take_profit_price,
-            metadata={**(model.metadata_json or {}), 'engine_name': model.engine_name}
+            metadata={**(model.metadata_json or {}), "engine_name": model.engine_name},
         )
-    
+
     def _trade_from_model(self, model: TradeModel) -> Trade:
         """Convert DB model to Trade object."""
         return Trade(
@@ -932,5 +1075,5 @@ class Database:
             exit_fee=model.exit_fee,
             total_fee=model.total_fee,
             strategy_name=model.engine_name or "",
-            close_reason=model.close_reason or ""
+            close_reason=model.close_reason or "",
         )

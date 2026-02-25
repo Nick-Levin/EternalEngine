@@ -13,15 +13,16 @@ Strategy:
 Risk Level: MINIMAL
 Market: Spot only (no derivatives)
 """
+
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
+
 import structlog
 
-from src.core.models import (
-    MarketData, TradingSignal, SignalType, Position, EngineType
-)
+from src.core.models import (EngineType, MarketData, Position, SignalType,
+                             TradingSignal)
 from src.engines.base import BaseEngine, EngineConfig
 
 logger = structlog.get_logger(__name__)
@@ -30,7 +31,7 @@ logger = structlog.get_logger(__name__)
 @dataclass
 class CoreHodlConfig(EngineConfig):
     """Configuration for CORE-HODL engine.
-    
+
     Attributes:
         dca_interval_hours: Hours between DCA purchases (default: weekly = 168)
         dca_amount_usdt: Fixed USD amount to purchase per DCA cycle
@@ -42,6 +43,7 @@ class CoreHodlConfig(EngineConfig):
         min_apy_pct: Minimum APY required for yield products (default: 2%)
         max_dca_price_deviation: Skip DCA if price deviates more than this (default: 50%)
     """
+
     dca_interval_hours: int = 168  # Weekly
     dca_amount_usdt: Decimal = Decimal("100.0")
     btc_target_pct: Decimal = Decimal("0.667")  # 2/3 BTC
@@ -51,128 +53,124 @@ class CoreHodlConfig(EngineConfig):
     yield_enabled: bool = True
     min_apy_pct: Decimal = Decimal("2.0")
     max_dca_price_deviation: Decimal = Decimal("0.50")  # 50%
-    
+
     def __post_init__(self):
-        if not hasattr(self, 'engine_type'):
+        if not hasattr(self, "engine_type"):
             self.engine_type = EngineType.CORE_HODL
 
 
 class CoreHodlEngine(BaseEngine):
     """
     CORE-HODL Engine - Long-term crypto accumulation.
-    
+
     This is the most conservative engine, designed for decades-long
     capital compounding through systematic BTC/ETH accumulation.
-    
+
     Key Behaviors:
     1. DCA: Regular fixed-amount purchases regardless of price
     2. Rebalancing: Maintain target allocation (BTC:ETH = 2:1)
     3. Yield: Generate passive income from idle ETH
     4. No Selling: Accumulation phase only - never sell during drawdowns
-    
+
     References:
     - See docs/04-trading-strategies/01-strategy-specifications.md
     - AGENTS.md section 2.1
     """
-    
+
     def __init__(
         self,
         symbols: List[str] = None,
         config: Optional[CoreHodlConfig] = None,
-        risk_manager=None
+        risk_manager=None,
     ):
         # Default symbols: BTC and ETH spot
         if symbols is None:
             symbols = ["BTCUSDT", "ETHUSDT"]
-        
+
         self.hodl_config = config or CoreHodlConfig(
-            engine_type=EngineType.CORE_HODL,
-            allocation_pct=Decimal("0.60")
+            engine_type=EngineType.CORE_HODL, allocation_pct=Decimal("0.60")
         )
-        
+
         super().__init__(
             config=self.hodl_config,
             engine_type=EngineType.CORE_HODL,
             symbols=symbols,
-            risk_manager=risk_manager
+            risk_manager=risk_manager,
         )
-        
+
         # DCA tracking
         self.last_dca_time: Dict[str, datetime] = {}
         self.dca_purchase_count: Dict[str, int] = {s: 0 for s in symbols}
         self.total_dca_invested: Dict[str, Decimal] = {s: Decimal("0") for s in symbols}
-        
+
         # Rebalancing tracking
         self.last_rebalance_check: Optional[datetime] = None
         self.rebalance_in_progress: bool = False
-        
+
         # Yield tracking
         self.eth_in_earn: Decimal = Decimal("0")
         self.current_apy: Decimal = Decimal("0")
-        
+
         # Price history for DCA deviation check
         self.avg_purchase_price: Dict[str, Decimal] = {s: Decimal("0") for s in symbols}
-        
+
         self.logger.info(
             "core_hodl.initialized",
             dca_amount=str(self.hodl_config.dca_amount_usdt),
             dca_interval_hours=self.hodl_config.dca_interval_hours,
             btc_target=str(self.hodl_config.btc_target_pct),
-            eth_target=str(self.hodl_config.eth_target_pct)
+            eth_target=str(self.hodl_config.eth_target_pct),
         )
-    
+
     async def analyze(self, data: Dict[str, List[MarketData]]) -> List[TradingSignal]:
         """
         Generate DCA and rebalancing signals.
-        
+
         Checks:
         1. Time-based DCA purchases
         2. Quarterly/periodic rebalancing
         3. Yield opportunities for ETH
         """
         signals = []
-        now = datetime.now(timezone.utc)
-        
+        now = datetime.utcnow()
+
         if not self.is_active:
             return signals
-        
+
         # Check each symbol for DCA
         for symbol in self.symbols:
             if symbol not in data or not data[symbol]:
                 continue
-            
+
             current_price = data[symbol][-1].close
-            
+
             # Check if it's time for DCA
             if self._should_execute_dca(symbol, now, current_price):
                 signal = self._create_dca_signal(symbol, current_price)
                 signals.append(signal)
-        
+
         # Check for rebalancing needs (quarterly or threshold-based)
         if self._should_rebalance(now):
             rebalance_signals = self._generate_rebalance_signals(data)
             signals.extend(rebalance_signals)
-        
+
         return signals
-    
+
     def _should_execute_dca(
-        self, 
-        symbol: str, 
-        now: datetime, 
-        current_price: Decimal
+        self, symbol: str, now: datetime, current_price: Decimal
     ) -> bool:
         """Check if DCA purchase should be executed."""
         last_purchase = self.last_dca_time.get(symbol)
-        
+
         # First purchase
         if last_purchase is None:
             return True
-        
+
         # Check time interval
         time_since_last = now - last_purchase
         if time_since_last < timedelta(hours=self.hodl_config.dca_interval_hours):
             return False
-        
+
         # Check price deviation (skip if price moved too much recently)
         avg_price = self.avg_purchase_price.get(symbol, Decimal("0"))
         if avg_price > 0:
@@ -183,14 +181,14 @@ class CoreHodlEngine(BaseEngine):
                     symbol=symbol,
                     current_price=str(current_price),
                     avg_price=str(avg_price),
-                    deviation=str(price_change)
+                    deviation=str(price_change),
                 )
                 # Still update the timer to avoid constant warnings
                 self.last_dca_time[symbol] = now
                 return False
-        
+
         return True
-    
+
     def _create_dca_signal(self, symbol: str, current_price: Decimal) -> TradingSignal:
         """Create a DCA buy signal."""
         # Calculate amount based on allocation target
@@ -198,41 +196,41 @@ class CoreHodlEngine(BaseEngine):
             allocation = self.hodl_config.btc_target_pct
         else:
             allocation = self.hodl_config.eth_target_pct
-        
+
         amount_usd = self.hodl_config.dca_amount_usdt * allocation
-        
+
         metadata = {
-            'strategy': 'DCA',
-            'engine': 'CORE-HODL',
-            'amount_usd': str(amount_usd),
-            'current_price': str(current_price),
-            'allocation_target': str(allocation),
-            'purchase_number': self.dca_purchase_count.get(symbol, 0) + 1
+            "strategy": "DCA",
+            "engine": "CORE-HODL",
+            "amount_usd": str(amount_usd),
+            "current_price": str(current_price),
+            "allocation_target": str(allocation),
+            "purchase_number": self.dca_purchase_count.get(symbol, 0) + 1,
         }
-        
+
         self.logger.info(
             "core_hodl.dca_signal",
             symbol=symbol,
             amount_usd=str(amount_usd),
-            price=str(current_price)
+            price=str(current_price),
         )
-        
+
         return self._create_signal(
             symbol=symbol,
             signal_type=SignalType.BUY,
             confidence=1.0,  # DCA is deterministic
-            metadata=metadata
+            metadata=metadata,
         )
-    
+
     def _should_rebalance(self, now: datetime) -> bool:
         """Check if rebalancing should be performed."""
         # Check based on frequency
         if self.last_rebalance_check is None:
             return True
-        
+
         frequency = self.hodl_config.rebalance_frequency
         time_since_last = now - self.last_rebalance_check
-        
+
         if frequency == "daily" and time_since_last >= timedelta(days=1):
             return True
         elif frequency == "weekly" and time_since_last >= timedelta(weeks=1):
@@ -241,108 +239,112 @@ class CoreHodlEngine(BaseEngine):
             return True
         elif frequency == "quarterly" and time_since_last >= timedelta(days=90):
             return True
-        
+
         return False
-    
+
     def _generate_rebalance_signals(
-        self, 
-        data: Dict[str, List[MarketData]]
+        self, data: Dict[str, List[MarketData]]
     ) -> List[TradingSignal]:
         """Generate rebalancing signals if allocation drifted."""
         signals = []
-        self.last_rebalance_check = datetime.now(timezone.utc)
-        
+        self.last_rebalance_check = datetime.utcnow()
+
         # Calculate current allocations
         total_value = Decimal("0")
         symbol_values: Dict[str, Decimal] = {}
-        
+
         for symbol in self.symbols:
             if symbol not in data or not data[symbol]:
                 continue
-            
+
             current_price = data[symbol][-1].close
             position = self.positions.get(symbol)
-            
+
             if position and position.is_open:
                 value = position.amount * current_price
             else:
                 value = Decimal("0")
-            
+
             symbol_values[symbol] = value
             total_value += value
-        
+
         if total_value == 0:
             return signals
-        
+
         # Check each symbol's allocation
         for symbol, current_value in symbol_values.items():
             current_pct = current_value / total_value
-            
+
             # Determine target allocation
             if "BTC" in symbol:
                 target_pct = self.hodl_config.btc_target_pct
             else:
                 target_pct = self.hodl_config.eth_target_pct
-            
+
             # Check if drift exceeds threshold
             drift = abs(current_pct - target_pct)
-            
+
             if drift > self.hodl_config.rebalance_threshold_pct:
                 signal = self._create_rebalance_signal(
                     symbol=symbol,
                     target_allocation=target_pct * total_value,
                     current_allocation=current_value,
-                    confidence=0.9
+                    confidence=0.9,
                 )
-                signal.metadata['rebalance_reason'] = f"drift_{drift:.2%}"
+                signal.metadata["rebalance_reason"] = f"drift_{drift:.2%}"
                 signals.append(signal)
-                
+
                 self.logger.info(
                     "core_hodl.rebalance_signal",
                     symbol=symbol,
                     current_pct=str(current_pct),
                     target_pct=str(target_pct),
-                    drift=str(drift)
+                    drift=str(drift),
                 )
-        
+
         return signals
-    
+
     async def on_order_filled(
-        self, 
-        symbol: str, 
-        side: str, 
-        amount: Decimal, 
+        self,
+        symbol: str,
+        side: str,
+        amount: Decimal,
         price: Decimal,
-        order_id: Optional[str] = None
+        order_id: Optional[str] = None,
     ):
         """Track DCA purchases and update position state."""
-        now = datetime.now(timezone.utc)
-        
+        now = datetime.utcnow()
+
         if side == "buy":
             # Update DCA tracking
             self.last_dca_time[symbol] = now
             self.dca_purchase_count[symbol] = self.dca_purchase_count.get(symbol, 0) + 1
-            
+
             # Calculate purchase value
             purchase_value = amount * price
-            self.total_dca_invested[symbol] = self.total_dca_invested.get(symbol, Decimal("0")) + purchase_value
-            
+            self.total_dca_invested[symbol] = (
+                self.total_dca_invested.get(symbol, Decimal("0")) + purchase_value
+            )
+
             # Update average purchase price
             total_invested = self.total_dca_invested[symbol]
             total_purchases = self.dca_purchase_count[symbol]
-            
+
             if total_purchases > 0:
                 # Approximate average
-                self.avg_purchase_price[symbol] = total_invested / (total_purchases * amount)
-            
+                self.avg_purchase_price[symbol] = total_invested / (
+                    total_purchases * amount
+                )
+
             # Update position tracking
             if symbol not in self.positions:
                 from src.core.models import Position, PositionSide
+
                 self.positions[symbol] = Position(
                     symbol=symbol,
                     side=PositionSide.LONG,
                     entry_price=price,
-                    amount=amount
+                    amount=amount,
                 )
             else:
                 # Update average entry price
@@ -351,94 +353,286 @@ class CoreHodlEngine(BaseEngine):
                 total_amount = pos.amount + amount
                 pos.entry_price = total_value / total_amount
                 pos.amount = total_amount
-            
+
             self.signals_executed += 1
             self.state.total_trades += 1
-            
+
             self.logger.info(
                 "core_hodl.purchase_recorded",
                 symbol=symbol,
                 amount=str(amount),
                 price=str(price),
                 total_invested=str(self.total_dca_invested[symbol]),
-                purchase_count=self.dca_purchase_count[symbol]
+                purchase_count=self.dca_purchase_count[symbol],
             )
-        
+
         elif side == "sell":
             # This would be a rebalance sell
             self.logger.info(
                 "core_hodl.rebalance_sell",
                 symbol=symbol,
                 amount=str(amount),
-                price=str(price)
+                price=str(price),
             )
-    
+
     async def on_position_closed(
-        self, 
-        symbol: str, 
-        pnl: Decimal, 
-        pnl_pct: Decimal,
-        close_reason: str = "signal"
+        self, symbol: str, pnl: Decimal, pnl_pct: Decimal, close_reason: str = "signal"
     ):
         """
         Track position close.
-        
+
         Note: CORE-HODL rarely closes positions. This would only happen
         during rebalancing or extreme circumstances.
         """
         self.total_pnl += pnl
-        
+
         # Update engine state
         if pnl > 0:
             self.state.winning_trades += 1
         else:
             self.state.losing_trades += 1
-        
+
         # Remove position tracking
         if symbol in self.positions:
             del self.positions[symbol]
-        
+
         self.logger.info(
             "core_hodl.position_closed",
             symbol=symbol,
             pnl=str(pnl),
             pnl_pct=str(pnl_pct),
-            reason=close_reason
+            reason=close_reason,
         )
-    
+
     def get_time_to_next_dca(self, symbol: str) -> Optional[timedelta]:
         """Get time remaining until next scheduled DCA."""
         if symbol not in self.last_dca_time:
             return timedelta(0)
-        
-        next_dca = self.last_dca_time[symbol] + timedelta(hours=self.hodl_config.dca_interval_hours)
-        remaining = next_dca - datetime.now(timezone.utc)
-        
+
+        next_dca = self.last_dca_time[symbol] + timedelta(
+            hours=self.hodl_config.dca_interval_hours
+        )
+        remaining = next_dca - datetime.utcnow()
+
         return remaining if remaining.total_seconds() > 0 else timedelta(0)
-    
+
     def get_dca_stats(self) -> Dict[str, Any]:
         """Get DCA-specific statistics."""
         return {
-            'total_invested': {k: str(v) for k, v in self.total_dca_invested.items()},
-            'purchase_count': self.dca_purchase_count,
-            'avg_investment': {
-                k: str(v / self.dca_purchase_count[k]) if self.dca_purchase_count[k] > 0 else "0"
+            "total_invested": {k: str(v) for k, v in self.total_dca_invested.items()},
+            "purchase_count": self.dca_purchase_count,
+            "avg_investment": {
+                k: (
+                    str(v / self.dca_purchase_count[k])
+                    if self.dca_purchase_count[k] > 0
+                    else "0"
+                )
                 for k, v in self.total_dca_invested.items()
             },
-            'next_dca_in_hours': {
+            "next_dca_in_hours": {
                 k: self.get_time_to_next_dca(k).total_seconds() / 3600
                 for k in self.symbols
-            }
+            },
         }
-    
+
     def get_stats(self) -> Dict[str, Any]:
         """Get CORE-HODL engine statistics."""
         base_stats = super().get_stats()
-        base_stats.update({
-            'dca_stats': self.get_dca_stats(),
-            'avg_purchase_price': {k: str(v) for k, v in self.avg_purchase_price.items()},
-            'eth_in_earn': str(self.eth_in_earn),
-            'current_apy': str(self.current_apy),
-            'accumulation_phase': True,  # CORE-HODL never sells during drawdowns
-        })
+        base_stats.update(
+            {
+                "dca_stats": self.get_dca_stats(),
+                "avg_purchase_price": {
+                    k: str(v) for k, v in self.avg_purchase_price.items()
+                },
+                "eth_in_earn": str(self.eth_in_earn),
+                "current_apy": str(self.current_apy),
+                "accumulation_phase": True,  # CORE-HODL never sells during drawdowns
+            }
+        )
         return base_stats
+
+    def get_full_state(self) -> Dict[str, Any]:
+        """
+        Get complete state for persistence.
+
+        Returns:
+            Dictionary with all critical CORE-HODL state that must survive restarts.
+        """
+        return {
+            "engine_type": self.engine_type.value,
+            "symbols": self.symbols,
+            # DCA tracking
+            "last_dca_time": {
+                k: v.isoformat() if v else None for k, v in self.last_dca_time.items()
+            },
+            "dca_purchase_count": self.dca_purchase_count,
+            "total_dca_invested": {
+                k: str(v) for k, v in self.total_dca_invested.items()
+            },
+            "avg_purchase_price": {
+                k: str(v) for k, v in self.avg_purchase_price.items()
+            },
+            # Rebalancing tracking
+            "last_rebalance_check": (
+                self.last_rebalance_check.isoformat()
+                if self.last_rebalance_check
+                else None
+            ),
+            "rebalance_in_progress": self.rebalance_in_progress,
+            # Yield tracking
+            "eth_in_earn": str(self.eth_in_earn),
+            "current_apy": str(self.current_apy),
+            # Engine state
+            "state": {
+                "is_active": self.state.is_active,
+                "can_trade": self.state.can_trade,
+                "is_paused": self.state.is_paused,
+                "pause_reason": self.state.pause_reason,
+                "pause_until": (
+                    self.state.pause_until.isoformat()
+                    if self.state.pause_until
+                    else None
+                ),
+                "current_value": str(self.state.current_value),
+                "cash_buffer": str(self.state.cash_buffer),
+                "total_trades": self.state.total_trades,
+                "winning_trades": self.state.winning_trades,
+                "losing_trades": self.state.losing_trades,
+            },
+            # Performance tracking
+            "signals_generated": self.signals_generated,
+            "signals_executed": self.signals_executed,
+            "total_pnl": str(self.total_pnl),
+            "total_fees": str(self.total_fees),
+        }
+
+    def restore_full_state(self, state: Dict[str, Any]):
+        """
+        Restore state from persisted data.
+
+        Args:
+            state: State dictionary previously returned by get_full_state()
+        """
+        from datetime import datetime
+
+        try:
+            # Restore DCA tracking
+            if "last_dca_time" in state:
+                for symbol, timestamp_str in state["last_dca_time"].items():
+                    if timestamp_str:
+                        try:
+                            self.last_dca_time[symbol] = datetime.fromisoformat(
+                                timestamp_str
+                            )
+                        except (ValueError, TypeError):
+                            self.logger.warning(
+                                "core_hodl.restore_invalid_timestamp",
+                                symbol=symbol,
+                                timestamp=timestamp_str,
+                            )
+
+            if "dca_purchase_count" in state:
+                self.dca_purchase_count.update(state["dca_purchase_count"])
+
+            if "total_dca_invested" in state:
+                for symbol, value_str in state["total_dca_invested"].items():
+                    try:
+                        self.total_dca_invested[symbol] = Decimal(value_str)
+                    except (ValueError, TypeError):
+                        self.total_dca_invested[symbol] = Decimal("0")
+
+            if "avg_purchase_price" in state:
+                for symbol, value_str in state["avg_purchase_price"].items():
+                    try:
+                        self.avg_purchase_price[symbol] = Decimal(value_str)
+                    except (ValueError, TypeError):
+                        self.avg_purchase_price[symbol] = Decimal("0")
+
+            # Restore rebalancing tracking
+            if "last_rebalance_check" in state and state["last_rebalance_check"]:
+                try:
+                    self.last_rebalance_check = datetime.fromisoformat(
+                        state["last_rebalance_check"]
+                    )
+                except (ValueError, TypeError):
+                    self.last_rebalance_check = None
+
+            if "rebalance_in_progress" in state:
+                self.rebalance_in_progress = state["rebalance_in_progress"]
+
+            # Restore yield tracking
+            if "eth_in_earn" in state:
+                try:
+                    self.eth_in_earn = Decimal(state["eth_in_earn"])
+                except (ValueError, TypeError):
+                    self.eth_in_earn = Decimal("0")
+
+            if "current_apy" in state:
+                try:
+                    self.current_apy = Decimal(state["current_apy"])
+                except (ValueError, TypeError):
+                    self.current_apy = Decimal("0")
+
+            # Restore engine state
+            if "state" in state:
+                state_data = state["state"]
+                self.state.is_active = state_data.get("is_active", self.state.is_active)
+                # Note: can_trade is computed from is_active, is_paused, circuit_breaker_level, pause_until
+                self.state.is_paused = state_data.get("is_paused", self.state.is_paused)
+                self.state.pause_reason = state_data.get("pause_reason")
+
+                if "pause_until" in state_data and state_data["pause_until"]:
+                    try:
+                        self.state.pause_until = datetime.fromisoformat(
+                            state_data["pause_until"]
+                        )
+                    except (ValueError, TypeError):
+                        self.state.pause_until = None
+
+                if "current_value" in state_data:
+                    try:
+                        self.state.current_value = Decimal(state_data["current_value"])
+                    except (ValueError, TypeError):
+                        pass
+
+                if "cash_buffer" in state_data:
+                    try:
+                        self.state.cash_buffer = Decimal(state_data["cash_buffer"])
+                    except (ValueError, TypeError):
+                        pass
+
+                self.state.total_trades = state_data.get(
+                    "total_trades", self.state.total_trades
+                )
+                self.state.winning_trades = state_data.get(
+                    "winning_trades", self.state.winning_trades
+                )
+                self.state.losing_trades = state_data.get(
+                    "losing_trades", self.state.losing_trades
+                )
+
+            # Restore performance tracking
+            if "signals_generated" in state:
+                self.signals_generated = state["signals_generated"]
+            if "signals_executed" in state:
+                self.signals_executed = state["signals_executed"]
+            if "total_pnl" in state:
+                try:
+                    self.total_pnl = Decimal(state["total_pnl"])
+                except (ValueError, TypeError):
+                    pass
+            if "total_fees" in state:
+                try:
+                    self.total_fees = Decimal(state["total_fees"])
+                except (ValueError, TypeError):
+                    pass
+
+            self.logger.info(
+                "core_hodl.state_restored",
+                symbols=list(self.last_dca_time.keys()),
+                total_purchases=sum(self.dca_purchase_count.values()),
+                total_invested=str(sum(self.total_dca_invested.values())),
+            )
+        except Exception as e:
+            self.logger.error("core_hodl.state_restore_error", error=str(e))
+            # Continue with default values - don't crash on restore failure

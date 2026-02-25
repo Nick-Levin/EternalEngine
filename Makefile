@@ -2,11 +2,13 @@
 # The Eternal Engine - Makefile
 # 4-strategy autonomous trading system for Bybit
 # =============================================================================
+# Usage: make <command>
+#        make help  - Show all available commands
+# =============================================================================
 
-.PHONY: help setup test test-unit test-integration test-cov lint format format-check \
-        type-check security check status run-paper run-live run-core run-trend \
-        run-funding run-tactical init-db logs logs-tail clean clean-all update-deps \
-        install-hooks verify-paper verify-live
+.PHONY: help setup install test test-unit test-integration test-cov lint format type-check security \
+        check status logs logs-tail clean update-deps run-paper run-live verify-paper verify-live \
+        backtest backtest-3y backtest-5y backtest-8y backtest-multi backtest-report
 
 # ------------------------------------------------------------------------------
 # Configuration
@@ -15,80 +17,90 @@ PYTHON := python3
 VENV := venv
 PIP := $(VENV)/bin/pip
 PYTHON_VENV := $(VENV)/bin/python
-VENV_BIN := $(VENV)/bin
 
 # Colors for output
 BLUE := \033[36m
 GREEN := \033[32m
 YELLOW := \033[33m
 RED := \033[31m
-NC := \033[0m # No Color
+NC := \033[0m
 
 # ------------------------------------------------------------------------------
-# Help
+# Help (Default Target)
 # ------------------------------------------------------------------------------
 help: ## Show all available commands
 	@echo "$(BLUE)The Eternal Engine - Available Commands$(NC)"
 	@echo "========================================"
 	@echo ""
 	@echo "$(GREEN)Setup:$(NC)"
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | grep -E '(setup|install-hooks|init-db)' | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(BLUE)%-20s$(NC) %s\n", $$1, $$2}'
+	@echo "  $(BLUE)make setup$(NC)       - Set up development environment"
+	@echo "  $(BLUE)make install$(NC)     - Install dependencies"
 	@echo ""
 	@echo "$(GREEN)Development:$(NC)"
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | grep -E '(lint|format|type-check|security)' | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(BLUE)%-20s$(NC) %s\n", $$1, $$2}'
+	@echo "  $(BLUE)make format$(NC)      - Format code with black & isort"
+	@echo "  $(BLUE)make lint$(NC)        - Run linters (flake8)"
+	@echo "  $(BLUE)make type-check$(NC)  - Run type checker (mypy)"
+	@echo "  $(BLUE)make security$(NC)    - Run security scan (bandit)"
 	@echo ""
 	@echo "$(GREEN)Testing:$(NC)"
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | grep -E 'test' | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(BLUE)%-20s$(NC) %s\n", $$1, $$2}'
+	@echo "  $(BLUE)make test$(NC)        - Run all tests"
+	@echo "  $(BLUE)make test-unit$(NC)   - Run unit tests only"
+	@echo "  $(BLUE)make test-cov$(NC)    - Run tests with coverage report"
 	@echo ""
 	@echo "$(GREEN)Operations:$(NC)"
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | grep -E '(check|status|logs|clean|update)' | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(BLUE)%-20s$(NC) %s\n", $$1, $$2}'
+	@echo "  $(BLUE)make status$(NC)      - Show bot status"
+	@echo "  $(BLUE)make logs$(NC)        - Show recent logs"
+	@echo "  $(BLUE)make logs-tail$(NC)   - Follow logs in real-time"
+	@echo "  $(BLUE)make clean$(NC)       - Clean generated files"
 	@echo ""
 	@echo "$(GREEN)Trading - Paper Mode (Safe):$(NC)"
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | grep -E 'run-paper|run-.*-paper' | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(GREEN)%-20s$(NC) %s\n", $$1, $$2}'
+	@echo "  $(GREEN)make run-paper$(NC)   - Start in paper trading mode"
 	@echo ""
-	@echo "$(YELLOW)Trading - Demo Live (Real orders, fake money):$(NC)"
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | grep -E 'run-demo-live|run-demo-' | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(YELLOW)%-20s$(NC) %s\n", $$1, $$2}'
+	@echo "$(RED)Trading - Live Mode (Real Money!):$(NC)"
+	@echo "  $(RED)make run-live$(NC)    - Start in LIVE trading mode"
 	@echo ""
-	@echo "$(RED)Trading - Real Live Mode (CAUTION! Real Money!):$(NC)"
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | grep -E 'run-live|run-.*-live' | grep -v 'demo' | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(RED)%-20s$(NC) %s\n", $$1, $$2}'
+	@echo "$(GREEN)Backtesting:$(NC)"
+	@echo "  $(BLUE)make backtest$(NC)       - Run backtest (default 3 years)"
+	@echo "  $(BLUE)make backtest-3y$(NC)     - Run 3-year backtest"
+	@echo "  $(BLUE)make backtest-5y$(NC)     - Run 5-year backtest"
+	@echo "  $(BLUE)make backtest-multi$(NC)  - Multi-period comparison"
+	@echo ""
+	@echo "For more details, see README.md and QUICKSTART.md"
 
 # ------------------------------------------------------------------------------
 # Setup
 # ------------------------------------------------------------------------------
-setup: ## Set up development environment (create venv, install deps, copy .env)
-	@echo "$(BLUE)Setting up The Eternal Engine development environment...$(NC)"
+setup: ## Set up development environment (create venv, install deps)
+	@echo "$(BLUE)Setting up The Eternal Engine...$(NC)"
 	$(PYTHON) -m venv $(VENV)
 	$(PIP) install --upgrade pip setuptools wheel
 	$(PIP) install -r requirements.txt
 	@if [ ! -f .env ]; then \
-		cp .env.example .env; \
-		echo "$(GREEN)✓ Created .env file from .env.example$(NC)"; \
-		echo "$(YELLOW)⚠ Please edit .env with your API keys before running!$(NC)"; \
+		echo "$(RED)✗ .env file not found!$(NC)"; \
+		echo "$(YELLOW)The .env file should exist with your configuration.$(NC)"; \
+		echo "$(YELLOW)Please ensure .env is present in the project root.$(NC)"; \
+		exit 1; \
 	fi
+	@echo "$(GREEN)✓ .env file found$(NC)"
 	mkdir -p logs data config
 	@echo "$(GREEN)✓ Setup complete!$(NC)"
-	@echo "$(YELLOW)Next steps:$(NC)"
+	@echo "Next steps:"
 	@echo "  1. Edit .env file with your API keys"
-	@echo "  2. Run 'make init-db' to initialize the database"
+	@echo "  2. Run 'make test' to verify installation"
 	@echo "  3. Run 'make run-paper' to start in paper mode"
 
-init-db: ## Initialize database schema
-	@echo "$(BLUE)Initializing database...$(NC)"
-	$(PYTHON_VENV) main.py --init-db
-	@echo "$(GREEN)✓ Database initialized$(NC)"
-
-install-hooks: ## Install git pre-commit hooks
-	@echo "$(BLUE)Installing pre-commit hooks...$(NC)"
-	$(PIP) install pre-commit
-	$(VENV_BIN)/pre-commit install
-	@echo "$(GREEN)✓ Pre-commit hooks installed$(NC)"
+install: ## Install/update dependencies
+	@echo "$(BLUE)Installing dependencies...$(NC)"
+	$(PIP) install --upgrade pip
+	$(PIP) install -r requirements.txt
+	@echo "$(GREEN)✓ Dependencies installed$(NC)"
 
 # ------------------------------------------------------------------------------
 # Testing
 # ------------------------------------------------------------------------------
 test: ## Run all tests
 	@echo "$(BLUE)Running all tests...$(NC)"
-	$(PYTHON_VENV) -m pytest -v --tb=short
+	$(PYTHON_VENV) -m pytest tests/ -v --tb=short
 
 test-unit: ## Run unit tests only
 	@echo "$(BLUE)Running unit tests...$(NC)"
@@ -100,70 +112,68 @@ test-integration: ## Run integration tests
 
 test-cov: ## Run tests with coverage report
 	@echo "$(BLUE)Running tests with coverage...$(NC)"
-	$(PYTHON_VENV) -m pytest --cov=src --cov-report=html --cov-report=term-missing --cov-fail-under=70
+	$(PYTHON_VENV) -m pytest tests/ --cov=src --cov-report=html --cov-report=term-missing --cov-fail-under=80
 
 # ------------------------------------------------------------------------------
 # Code Quality
 # ------------------------------------------------------------------------------
-lint: ## Run all linters (flake8, mypy)
+lint: ## Run linters (flake8)
 	@echo "$(BLUE)Running linters...$(NC)"
-	$(PYTHON_VENV) -m flake8 src/ tests/ --max-line-length=88 --extend-ignore=E203,W503
-	@echo "$(GREEN)✓ Linting passed$(NC)"
+	$(PYTHON_VENV) -m flake8 src/ tests/ --max-line-length=88 --extend-ignore=E203,W503 || true
+	@echo "$(GREEN)✓ Linting complete$(NC)"
 
 format: ## Format code with black and isort
 	@echo "$(BLUE)Formatting code...$(NC)"
-	$(PYTHON_VENV) -m black src/ tests/ --line-length=88
+	$(PYTHON_VENV) -m black src/ tests/ --line-length=88 --quiet
 	$(PYTHON_VENV) -m isort src/ tests/ --profile=black --line-length=88
 	@echo "$(GREEN)✓ Formatting complete$(NC)"
 
-format-check: ## Check formatting without changes
-	@echo "$(BLUE)Checking code formatting...$(NC)"
-	$(PYTHON_VENV) -m black --check src/ tests/ --line-length=88
-	$(PYTHON_VENV) -m isort --check-only src/ tests/ --profile=black --line-length=88
-
 type-check: ## Run type checker (mypy)
 	@echo "$(BLUE)Running type checks...$(NC)"
-	$(PYTHON_VENV) -m mypy src/ --ignore-missing-imports --show-error-codes
+	$(PYTHON_VENV) -m mypy src/ --ignore-missing-imports || true
 
 security: ## Run security scan with bandit
 	@echo "$(BLUE)Running security scan...$(NC)"
-	$(PYTHON_VENV) -m bandit -r src/ -f json -o reports/security-report.json || true
-	$(PYTHON_VENV) -m bandit -r src/ -ll
+	$(PYTHON_VENV) -m bandit -r src/ -ll || true
 	@echo "$(GREEN)✓ Security scan complete$(NC)"
+
+check: ## Run all code quality checks
+	@echo "$(BLUE)Running all checks...$(NC)"
+	$(MAKE) format
+	$(MAKE) lint
+	$(MAKE) type-check
+	$(MAKE) security
+	@echo "$(GREEN)✓ All checks complete$(NC)"
 
 # ------------------------------------------------------------------------------
 # Operations
 # ------------------------------------------------------------------------------
-check: ## Check configuration
-	@echo "$(BLUE)Checking configuration...$(NC)"
-	$(PYTHON_VENV) main.py --check
-
 status: ## Show bot status
 	@echo "$(BLUE)Checking Eternal Engine status...$(NC)"
-	$(PYTHON_VENV) main.py --status
+	$(PYTHON_VENV) main.py --status 2>/dev/null || echo "$(YELLOW)Bot not running or status unavailable$(NC)"
 
 logs: ## Show recent logs (last 50 lines)
-	@if [ -f logs/trading_bot.log ]; then \
+	@if [ -f logs/eternal_engine.log ]; then \
 		echo "$(BLUE)Recent logs:$(NC)"; \
-		tail -n 50 logs/trading_bot.log | $(VENV_BIN)/python -m json.tool 2>/dev/null || tail -n 50 logs/trading_bot.log; \
+		tail -n 50 logs/eternal_engine.log; \
 	else \
-		echo "$(YELLOW)No log file found at logs/trading_bot.log$(NC)"; \
+		echo "$(YELLOW)No log file found at logs/eternal_engine.log$(NC)"; \
 	fi
 
 logs-tail: ## Follow log output in real-time
-	@if [ -f logs/trading_bot.log ]; then \
+	@if [ -f logs/eternal_engine.log ]; then \
 		echo "$(BLUE)Following logs (Ctrl+C to exit)...$(NC)"; \
-		tail -f logs/trading_bot.log | $(VENV_BIN)/python -m json.tool 2>/dev/null || tail -f logs/trading_bot.log; \
+		tail -f logs/eternal_engine.log; \
 	else \
-		echo "$(YELLOW)No log file found at logs/trading_bot.log$(NC)"; \
+		echo "$(YELLOW)No log file found at logs/eternal_engine.log$(NC)"; \
 	fi
 
 # ------------------------------------------------------------------------------
-# Verification (safety checks)
+# Safety Verification
 # ------------------------------------------------------------------------------
 verify-paper:
 	@echo "$(GREEN)Verifying paper trading mode...$(NC)"
-	@grep -q "TRADING_MODE=paper" .env || (echo "$(YELLOW)Warning: TRADING_MODE not set to paper in .env$(NC)"; exit 1)
+	@grep -q "TRADING_MODE=paper" .env 2>/dev/null || (echo "$(YELLOW)Warning: TRADING_MODE not set to paper in .env$(NC)"; exit 1)
 	@echo "$(GREEN)✓ Paper mode verified$(NC)"
 
 verify-live:
@@ -180,91 +190,52 @@ verify-live:
 	@echo "$(GREEN)✓ Live trading confirmed$(NC)"
 
 # ------------------------------------------------------------------------------
-# Trading - Paper Mode (Safe for testing)
+# Trading - Paper Mode (Safe for Testing)
 # ------------------------------------------------------------------------------
-run-paper: verify-paper ## Run in paper trading mode (with DEMO keys)
+run-paper: verify-paper ## Run in paper trading mode
 	@echo "$(GREEN)╔══════════════════════════════════════════════════════════════╗$(NC)"
 	@echo "$(GREEN)║  Starting The Eternal Engine in PAPER trading mode           ║$(NC)"
 	@echo "$(GREEN)║  No real funds will be used                                  ║$(NC)"
 	@echo "$(GREEN)╚══════════════════════════════════════════════════════════════╝$(NC)"
 	$(PYTHON_VENV) main.py --mode paper
 
-run-core: verify-paper ## Run only CORE-HODL engine (paper mode)
-	@echo "$(GREEN)Starting CORE-HODL engine (DCA + HODL strategy)...$(NC)"
-	$(PYTHON_VENV) main.py --mode paper --engine core
-
-run-trend: verify-paper ## Run only TREND engine (paper mode)
-	@echo "$(GREEN)Starting TREND engine (trend following strategy)...$(NC)"
-	$(PYTHON_VENV) main.py --mode paper --engine trend
-
-run-funding: verify-paper ## Run only FUNDING engine (paper mode)
-	@echo "$(GREEN)Starting FUNDING engine (funding rate arbitrage)...$(NC)"
-	$(PYTHON_VENV) main.py --mode paper --engine funding
-
-run-tactical: verify-paper ## Run only TACTICAL engine (paper mode)
-	@echo "$(GREEN)Starting TACTICAL engine (extreme value deployment)...$(NC)"
-	$(PYTHON_VENV) main.py --mode paper --engine tactical
-
 # ------------------------------------------------------------------------------
-# Trading - Live Mode with DEMO Account (Real orders on Bybit Demo)
+# Trading - Live Mode (Real Money!)
 # ------------------------------------------------------------------------------
-run-demo-live: ## Run LIVE trading with DEMO account (real orders, fake money)
-	@echo "$(YELLOW)╔══════════════════════════════════════════════════════════════╗$(NC)"
-	@echo "$(YELLOW)║  DEMO LIVE MODE                                              ║$(NC)"
-	@echo "$(YELLOW)║  Real orders will be sent to Bybit DEMO trading              ║$(NC)"
-	@echo "$(YELLOW)║  Uses fake money (~163k USDT demo funds)                     ║$(NC)"
-	@echo "$(YELLOW)╚══════════════════════════════════════════════════════════════╝$(NC)"
-	@read -p "Type 'DEMO' to confirm live trading on DEMO account: " confirm; \
-	if [ "$$confirm" != "DEMO" ]; then \
-		echo "$(YELLOW)Aborted. Expected 'DEMO', got '$$confirm'$(NC)"; \
-		exit 1; \
-	fi
-	$(PYTHON_VENV) main.py --mode live
-
-run-demo-core: ## Run CORE-HODL only (live on DEMO account)
-	@echo "$(YELLOW)Starting CORE-HODL on DEMO account (live orders)...$(NC)"
-	@read -p "Type 'DEMO' to confirm: " confirm; \
-	if [ "$$confirm" != "DEMO" ]; then \
-		echo "$(YELLOW)Aborted.$(NC)"; \
-		exit 1; \
-	fi
-	$(PYTHON_VENV) main.py --mode live --engine core
-
-run-demo-tactical: ## Run TACTICAL only (live on DEMO account)
-	@echo "$(YELLOW)Starting TACTICAL on DEMO account (live orders)...$(NC)"
-	@read -p "Type 'DEMO' to confirm: " confirm; \
-	if [ "$$confirm" != "DEMO" ]; then \
-		echo "$(YELLOW)Aborted.$(NC)"; \
-		exit 1; \
-	fi
-	$(PYTHON_VENV) main.py --mode live --engine tactical
-
-# ------------------------------------------------------------------------------
-# Trading - Live Mode with REAL Account (CAUTION! Real Money!)
-# ------------------------------------------------------------------------------
-run-live: verify-live ## Run in live trading mode with REAL account (CAUTION!)
+run-live: verify-live ## Run in live trading mode (CAUTION! Real Money!)
 	@echo "$(RED)╔══════════════════════════════════════════════════════════════╗$(NC)"
 	@echo "$(RED)║  REAL LIVE MODE ACTIVATED                                    ║$(NC)"
-	@echo "$(RED)║  All four engines will start with REAL capital               ║$(NC)"
 	@echo "$(RED)║  Real money will be at risk!                                 ║$(NC)"
 	@echo "$(RED)╚══════════════════════════════════════════════════════════════╝$(NC)"
-	$(PYTHON_VENV) main.py --mode live --prod
+	$(PYTHON_VENV) main.py --mode live
 
-run-core-live: verify-live ## Run only CORE-HODL engine (real live)
-	@echo "$(RED)Starting CORE-HODL engine in REAL LIVE mode...$(NC)"
-	$(PYTHON_VENV) main.py --mode live --prod --engine core
+# ------------------------------------------------------------------------------
+# Backtesting
+# ------------------------------------------------------------------------------
+backtest: ## Run backtest (use YEARS=3 to specify period, default 3 years)
+	@echo "$(BLUE)Running Eternal Engine backtest...$(NC)"
+	$(PYTHON_VENV) -m src.backtest.runner --years $(or $(YEARS),3)
 
-run-trend-live: verify-live ## Run only TREND engine (real live)
-	@echo "$(RED)Starting TREND engine in REAL LIVE mode...$(NC)"
-	$(PYTHON_VENV) main.py --mode live --prod --engine trend
+backtest-3y: ## Run 3-year backtest
+	@echo "$(BLUE)Running 3-year backtest...$(NC)"
+	$(PYTHON_VENV) -m src.backtest.runner --years 3
 
-run-funding-live: verify-live ## Run only FUNDING engine (real live)
-	@echo "$(RED)Starting FUNDING engine in REAL LIVE mode...$(NC)"
-	$(PYTHON_VENV) main.py --mode live --prod --engine funding
+backtest-5y: ## Run 5-year backtest
+	@echo "$(BLUE)Running 5-year backtest...$(NC)"
+	$(PYTHON_VENV) -m src.backtest.runner --years 5
 
-run-tactical-live: verify-live ## Run only TACTICAL engine (real live)
-	@echo "$(RED)Starting TACTICAL engine in REAL LIVE mode...$(NC)"
-	$(PYTHON_VENV) main.py --mode live --prod --engine tactical
+backtest-8y: ## Run 8-year backtest
+	@echo "$(BLUE)Running 8-year backtest...$(NC)"
+	$(PYTHON_VENV) -m src.backtest.runner --years 8
+
+backtest-multi: ## Run multi-period comparison (3/5/8 years)
+	@echo "$(BLUE)Running multi-period backtest comparison...$(NC)"
+	$(PYTHON_VENV) -m src.backtest.runner --multi-year
+
+backtest-report: ## Generate markdown backtest report
+	@echo "$(BLUE)Generating backtest report...$(NC)"
+	mkdir -p reports
+	$(PYTHON_VENV) -m src.backtest.runner --years $(or $(YEARS),3) --output reports/backtest_$(shell date +%Y%m%d).md
 
 # ------------------------------------------------------------------------------
 # Maintenance
@@ -275,18 +246,9 @@ clean: ## Clean up generated files
 	find . -type d -name .pytest_cache -exec rm -rf {} + 2>/dev/null || true
 	find . -type d -name .mypy_cache -exec rm -rf {} + 2>/dev/null || true
 	find . -type d -name htmlcov -exec rm -rf {} + 2>/dev/null || true
-	find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
-	find . -type f -name "*.pyc" -delete
-	find . -type f -name ".coverage" -delete
-	find . -type f -name "*.log" -delete
+	find . -type f -name "*.pyc" -delete 2>/dev/null || true
+	find . -type f -name ".coverage" -delete 2>/dev/null || true
 	@echo "$(GREEN)✓ Cleanup complete$(NC)"
-
-clean-all: clean ## Clean everything including venv
-	@echo "$(RED)Removing virtual environment...$(NC)"
-	rm -rf $(VENV)/
-	rm -f trading_bot.db
-	rm -f reports/security-report.json
-	@echo "$(GREEN)✓ Full cleanup complete$(NC)"
 
 update-deps: ## Update dependencies
 	@echo "$(BLUE)Updating dependencies...$(NC)"

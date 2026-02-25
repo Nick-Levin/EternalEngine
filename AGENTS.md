@@ -20,6 +20,50 @@
 
 ---
 
+## 🚀 Quick Start for AI Agents
+
+### Task Type → File Mapping
+
+| Task | Read First | Secondary |
+|------|------------|-----------|
+| **New Engine** | `src/engines/base.py` | `docs/04-trading-strategies/01-strategy-specifications.md`, `src/engines/core_hodl.py` |
+| **Risk Changes** | `src/risk/risk_manager.py` | `docs/05-risk-management/01-risk-framework.md`, `docs/decisions/*-risk*.md` |
+| **Exchange/API** | `src/exchange/bybit_client.py` | `docs/06-infrastructure/01-bybit-integration.md` |
+| **Strategy Logic** | `src/strategies/base.py` | `docs/04-trading-strategies/01-strategy-specifications.md` |
+| **Bug Fix** | `docs/lessons-learned.md` | `DEVLOG.md` for recent changes |
+| **Architecture** | `ARCHITECTURE.md` | `docs/03-system-architecture/01-technical-overview.md` |
+
+### Critical Constants (Never Hardcode Differently)
+
+```python
+# Position Sizing
+KELLY_FRACTION = 0.125  # 1/8 Kelly
+MAX_POSITION_PCT = 0.05  # 5% per position
+MAX_RISK_PER_TRADE = 0.01  # 1% portfolio risk
+
+# Circuit Breakers
+LEVEL_1_DRAWDOWN = 0.10  # 10%
+LEVEL_2_DRAWDOWN = 0.15  # 15%
+LEVEL_3_DRAWDOWN = 0.20  # 20%
+LEVEL_4_DRAWDOWN = 0.25  # 25%
+
+# Limits
+MAX_LEVERAGE = 2.0
+MAX_CONCURRENT_POSITIONS = 3
+```
+
+### Code Quality Gates (Run Before Submitting)
+
+```bash
+black src/ && isort src/ && flake8 src/ && mypy src/ && bandit -r src/ && pytest tests/unit/ -v
+```
+
+### Safety Red Flags (STOP and Confirm)
+- "Disable circuit breaker" | "Skip risk check" | "Use full Kelly"
+- "Increase leverage" | "Override safety" | "Go live without testing"
+
+---
+
 ## 1. Project Identity
 
 ### The Eternal Engine
