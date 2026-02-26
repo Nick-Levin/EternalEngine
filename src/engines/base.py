@@ -207,7 +207,7 @@ class BaseEngine(ABC):
     
     def get_state(self) -> EngineState:
         """Get current engine state."""
-        self.state.last_update_time = datetime.utcnow()
+        self.state.last_update_time = datetime.now(timezone.utc)
         return self.state
     
     def get_stats(self) -> Dict[str, Any]:
@@ -289,12 +289,12 @@ class BaseEngine(ABC):
             signal_type=signal_type,
             strategy_name=self.__class__.__name__,
             engine_type=self.engine_type,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             confidence=confidence,
             metadata=metadata or {}
         )
         self.signals_generated += 1
-        self.state.last_signal_time = datetime.utcnow()
+        self.state.last_signal_time = datetime.now(timezone.utc)
         return signal
     
     def _create_buy_signal(

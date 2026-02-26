@@ -474,6 +474,44 @@ class PybitDemoClient:
         }
         return status_map.get(status, "unknown")
 
+    async def fetch_open_orders(self, symbol: str = None, params=None):
+        """Fetch open orders (async wrapper for pybit)."""
+        loop = asyncio.get_event_loop()
+        
+        try:
+            # Build parameters
+            request_params = {"category": "spot"}
+            if symbol:
+                request_params["symbol"] = symbol
+                
+            result = await loop.run_in_executor(
+                self._executor,
+                lambda: self._client.get_open_orders(**request_params),
+            )
+            
+            if result.get("retCode") == 0:
+                orders = result.get("result", {}).get("list", [])
+                # Convert to ccxt-like format
+                return [
+                    {
+                        "id": o.get("orderId"),
+                        "symbol": o.get("symbol"),
+                        "side": o.get("side", "").lower(),
+                        "type": o.get("orderType", "").lower(),
+                        "price": float(o.get("price", 0)),
+                        "amount": float(o.get("qty", 0)),
+                        "filled": float(o.get("cumExecQty", 0)),
+                        "remaining": float(o.get("leavesQty", 0)),
+                        "status": self._map_order_status(o.get("orderStatus", "")),
+                        "timestamp": int(o.get("createdTime", 0)),
+                    }
+                    for o in orders
+                ]
+            return []
+        except Exception as e:
+            logger.warning("pybit_demo.fetch_open_orders_error", symbol=symbol, error=str(e))
+            return []
+
     async def close(self):
         """Close the client."""
         if hasattr(self, "_market_exchange"):

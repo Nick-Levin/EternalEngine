@@ -175,7 +175,7 @@ class FundingEngine(BaseEngine):
         if not self.is_active:
             return signals
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         for asset in self.funding_config.assets:
             spot_symbol = f"{asset}USDT"
@@ -496,7 +496,7 @@ class FundingEngine(BaseEngine):
             self.arbitrage_positions[asset] = {
                 "spot_size": Decimal("0"),
                 "perp_size": Decimal("0"),
-                "entry_time": datetime.utcnow(),
+                "entry_time": datetime.now(timezone.utc),
                 "entry_spot_price": Decimal("0"),
                 "entry_perp_price": Decimal("0"),
             }
@@ -791,9 +791,9 @@ class FundingEngine(BaseEngine):
                                     entry_time_str
                                 )
                             except (ValueError, TypeError):
-                                position["entry_time"] = datetime.utcnow()
+                                position["entry_time"] = datetime.now(timezone.utc)
                         else:
-                            position["entry_time"] = datetime.utcnow()
+                            position["entry_time"] = datetime.now(timezone.utc)
 
                         self.arbitrage_positions[asset] = position
                     except (ValueError, TypeError) as e:

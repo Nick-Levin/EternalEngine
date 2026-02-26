@@ -177,7 +177,7 @@ class TacticalEngine(BaseEngine):
         if not self.is_active:
             return signals
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         # Update market state
         self._update_market_state(data, now)
@@ -333,7 +333,7 @@ class TacticalEngine(BaseEngine):
         btc_amount = deployment_amount * self.tactical_config.btc_allocation
         eth_amount = deployment_amount * self.tactical_config.eth_allocation
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         # BTC signal
         if "BTCUSDT" in data and data["BTCUSDT"]:

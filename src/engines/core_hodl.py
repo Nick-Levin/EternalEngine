@@ -132,7 +132,7 @@ class CoreHodlEngine(BaseEngine):
         3. Yield opportunities for ETH
         """
         signals = []
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         if not self.is_active:
             return signals
@@ -247,7 +247,7 @@ class CoreHodlEngine(BaseEngine):
     ) -> List[TradingSignal]:
         """Generate rebalancing signals if allocation drifted."""
         signals = []
-        self.last_rebalance_check = datetime.utcnow()
+        self.last_rebalance_check = datetime.now(timezone.utc)
 
         # Calculate current allocations
         total_value = Decimal("0")
@@ -313,7 +313,7 @@ class CoreHodlEngine(BaseEngine):
         order_id: Optional[str] = None,
     ):
         """Track DCA purchases and update position state."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         if side == "buy":
             # Update DCA tracking
@@ -412,7 +412,7 @@ class CoreHodlEngine(BaseEngine):
         next_dca = self.last_dca_time[symbol] + timedelta(
             hours=self.hodl_config.dca_interval_hours
         )
-        remaining = next_dca - datetime.utcnow()
+        remaining = next_dca - datetime.now(timezone.utc)
 
         return remaining if remaining.total_seconds() > 0 else timedelta(0)
 
