@@ -582,8 +582,8 @@ async def main():
     # Handle API mode flags
     if args.demo:
         engine_config.bybit.api_mode = "demo"
-        engine_config.bybit.testnet = True
-        print("✓ DEMO mode selected (testnet)")
+        engine_config.bybit.testnet = False  # Demo Trading uses mainnet with demo keys
+        print("✓ DEMO mode selected (Bybit Demo Trading)")
     elif args.prod:
         engine_config.bybit.api_mode = "prod"
         engine_config.bybit.testnet = False
@@ -596,7 +596,9 @@ async def main():
             engine_config.legacy.trading_mode = "live"
             engine_config.trading_mode.trading_mode = "live"
             engine_config.bybit.api_mode = "demo"
-            engine_config.bybit.testnet = True
+            engine_config.bybit.testnet = (
+                False  # Demo Trading uses mainnet with demo keys
+            )
             from src.core.config import trading_config
 
             trading_config.trading_mode = "live"
